@@ -1,0 +1,81 @@
+from mathutils import Vector
+
+import bpy
+
+CustomLevel=open('D:\\SteamLibrary\\steamapps\\common\\Switchball\\data\\bod\\common\\script\\level\\CustomLevel.vnl', 'w')
+
+
+
+#if bpy.context.selected_objects[0].children:
+
+#    print(str(bpy.context.selected_objects[0]) + " has children")
+
+#    print(str(bpy.context.selected_objects[0].children))
+
+
+
+# start of the level
+
+CustomLevel.write('<'+str(bpy.data.collections['level'].name)+'>')
+
+
+
+for obj in bpy.context.selected_objects:
+
+    
+
+    # name and ID
+
+    if obj.name.find(".") != -1:
+
+        CustomLevel.write('\n\t'+'<object type='+'"'+obj.name[:-4]+'"'' ')
+
+    else:
+
+        CustomLevel.write('\n\t'+'<object type='+'"'+obj.name+'"'' ')
+
+        
+
+    CustomLevel.write('id='+'"'+str(obj.data['id'])+'"'' ')
+
+    # quaternion rotations
+
+    CustomLevel.write(str("right_x=")+'"'+str(obj.matrix_world[0][0])+'"'+' ')
+
+    CustomLevel.write(str("right_y=")+'"'+str(obj.matrix_world[0][1])+'"'+' ')
+
+    CustomLevel.write(str("right_z=")+'"'+str(obj.matrix_world[0][2])+'"'+' ')
+
+    CustomLevel.write(str("up_x=")+'"'+str(obj.matrix_world[1][0])+'"'+' ')
+
+    CustomLevel.write(str("up_y=")+'"'+str(obj.matrix_world[1][1])+'"'+' ')
+
+    CustomLevel.write(str("up_z=")+'"'+str(obj.matrix_world[1][2])+'"'+' ')
+
+    CustomLevel.write(str("forward_x=")+'"'+str(obj.matrix_world[2][0])+'"'+' ')
+
+    CustomLevel.write(str("forward_y=")+'"'+str(obj.matrix_world[2][1])+'"'+' ')
+
+    CustomLevel.write(str("forward_z=")+'"'+str(obj.matrix_world[2][2])+'"'+' ')
+
+    # location
+
+    CustomLevel.write(str("pos_x="+'"'+str(obj.location.x))+'"'+' ')
+
+    CustomLevel.write(str("pos_y="+'"'+str(obj.location.z))+'"'+' ')
+
+    CustomLevel.write(str("pos_z="+'"'+str(obj.location.y))+'"'+' />')
+
+    # right_x="-0.707107" right_y="0" right_z="-0.707107" up_x="0" up_y="1" up_z="0" forward_x="0.707107" forward_y="0" forward_z="-0.707107"
+
+    # pos_x="7" pos_y="14.49" pos_z="-14"
+
+# end of the level
+
+CustomLevel.write('\n'+'</'+str(bpy.data.collections['level'].name)+'>')
+
+
+
+# closes the file, copy all level data in this file to a level of your choice ex: skyworld1.vnl, menu.vnl, etc.
+
+CustomLevel.close()
