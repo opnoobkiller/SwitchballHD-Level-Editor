@@ -1,81 +1,124 @@
-from mathutils import Vector
+bl_info = {
+    "name": "Blender to Switchball",
+    "author": "U live u learn and regret",
+    "version": (1, 0),
+    "blender": (4, 0, 2),
+    "location": "Properties > Scene > Compilers Panel",
+    "description": "Converts blender object data to .vnl for Switchball",
+    "warning": "",
+    "doc_url": "",
+    "category": "Development",
+}
 
+from mathutils import Vector
 import bpy
 
-CustomLevel=open('D:\\SteamLibrary\\steamapps\\common\\Switchball\\data\\bod\\common\\script\\level\\CustomLevel.vnl', 'w')
+def main(context):
+    CustomLevel=open('D:\\SteamLibrary\\steamapps\\common\\Switchball\\data\\bod\\common\\script\\level\\CustomLevel.vnl', 'w')
 
-
-
-#if bpy.context.selected_objects[0].children:
-
-#    print(str(bpy.context.selected_objects[0]) + " has children")
-
-#    print(str(bpy.context.selected_objects[0].children))
-
-
-
-# start of the level
-
-CustomLevel.write('<'+str(bpy.data.collections['level'].name)+'>')
-
-
-
-for obj in bpy.context.selected_objects:
-
+    # rounds negative exponents
+    def RNEXP(float):
+        return round(float, 7)
     
+    # rounds zero point exponents
+    def REXP(float):
+        return round(float, 6)
 
-    # name and ID
+    axis = ['x','y','z']
+    direction = ['right','up','forward']
+    pos = 'pos'
 
-    if obj.name.find(".") != -1:
+    Neg_zero = -4.371138828673793e-08
+    Neg_one = -1.1920928955078125e-07
 
-        CustomLevel.write('\n\t'+'<object type='+'"'+obj.name[:-4]+'"'' ')
+    #if bpy.context.selected_objects[0].children:
+    #    print(str(bpy.context.selected_objects[0]) + " has children")
+    #    print(str(bpy.context.selected_objects[0].children))
+    #thing to note:
+    # Arrow_Helper and Cloth, along with Fluid Contact, Menu Box, Rope Medium Medium, Cloth Fitpoint,
+    # Swingboard, Switch Button, Switch Trigger, Morph,all crash the game without necessary properties and fitpoints
+    # for Cloth and Rope Medium Medium, use Fitpoints instead with properties and params
 
-    else:
+    # cannon, behaviour = idle, autofire, locked
+    # fitpoint, behaviour = hanging, stretched
 
-        CustomLevel.write('\n\t'+'<object type='+'"'+obj.name+'"'' ')
+    # start of the level
+    CustomLevel.write('<'+bpy.data.collections['level'].name+'>')
 
+    for num,obj in enumerate(bpy.context.selected_objects):
+    
+        # name and ID
+        if obj.name.find(".") != -1:
+            CustomLevel.write('\n\t<object type="'+obj.name[:-4]+'" ')
+        else:
+            CustomLevel.write('\n\t<object type="'+obj.name+'" ')
         
+        CustomLevel.write('id="'+str(num)+'" ')
+        # quaternion rotations
+        # kudos to me I fixed the code, it looks so nice right now!
+        for n, vector in enumerate(obj.rotation_euler.to_matrix()):
+            for i, float in enumerate(vector):
+                if float == Neg_zero:
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RNEXP(float))+'" ')
+                else:
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(float))+'" ')
+                
+        # location
+        CustomLevel.write(str('pos_x="'+str(obj.location.x))+'" ')
+        CustomLevel.write(str('pos_y="'+str(obj.location.z))+'" ')
+        CustomLevel.write(str('pos_z="'+str(obj.location.y))+'" />')
+    
+    # end of the level
+    CustomLevel.write('\n</'+bpy.data.collections['level'].name+'>')
 
-    CustomLevel.write('id='+'"'+str(obj.data['id'])+'"'' ')
-
-    # quaternion rotations
-
-    CustomLevel.write(str("right_x=")+'"'+str(obj.matrix_world[0][0])+'"'+' ')
-
-    CustomLevel.write(str("right_y=")+'"'+str(obj.matrix_world[0][1])+'"'+' ')
-
-    CustomLevel.write(str("right_z=")+'"'+str(obj.matrix_world[0][2])+'"'+' ')
-
-    CustomLevel.write(str("up_x=")+'"'+str(obj.matrix_world[1][0])+'"'+' ')
-
-    CustomLevel.write(str("up_y=")+'"'+str(obj.matrix_world[1][1])+'"'+' ')
-
-    CustomLevel.write(str("up_z=")+'"'+str(obj.matrix_world[1][2])+'"'+' ')
-
-    CustomLevel.write(str("forward_x=")+'"'+str(obj.matrix_world[2][0])+'"'+' ')
-
-    CustomLevel.write(str("forward_y=")+'"'+str(obj.matrix_world[2][1])+'"'+' ')
-
-    CustomLevel.write(str("forward_z=")+'"'+str(obj.matrix_world[2][2])+'"'+' ')
-
-    # location
-
-    CustomLevel.write(str("pos_x="+'"'+str(obj.location.x))+'"'+' ')
-
-    CustomLevel.write(str("pos_y="+'"'+str(obj.location.z))+'"'+' ')
-
-    CustomLevel.write(str("pos_z="+'"'+str(obj.location.y))+'"'+' />')
-
-    # right_x="-0.707107" right_y="0" right_z="-0.707107" up_x="0" up_y="1" up_z="0" forward_x="0.707107" forward_y="0" forward_z="-0.707107"
-
-    # pos_x="7" pos_y="14.49" pos_z="-14"
-
-# end of the level
-
-CustomLevel.write('\n'+'</'+str(bpy.data.collections['level'].name)+'>')
+    # closes the file, copy all level data in this file to a level of your choice ex: skyworld1.vnl, menu.vnl, etc.
+    CustomLevel.close()
 
 
+class SimpleOperator(bpy.types.Operator):
+    """Tooltip"""
+    bl_idname = "object.simple_operator"
+    bl_label = "Compile"
 
-# closes the file, copy all level data in this file to a level of your choice ex: skyworld1.vnl, menu.vnl, etc.
+    def execute(self, context):
+        main(context)
+        return {'FINISHED'}
 
-CustomLevel.close()
+
+def menu_func(self, context):
+    self.layout.operator(SimpleOperator.bl_idname, text=SimpleOperator.bl_label)
+
+class CompilerPanel(bpy.types.Panel):
+    """Creates a Panel in the scene context of the properties editor"""
+    bl_label = "Compilers"
+    bl_idname = "SCENE_PT_layout"
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = "scene"
+
+    def draw(self, context):
+        layout = self.layout
+
+        scene = context.scene
+
+        # Big render button
+        layout.label(text="Level:")
+        row = layout.row()
+        row.scale_y = 1.0
+        row.operator("object.simple_operator")
+
+# Register and add to the "object" menu (required to also use F3 search "Simple Object Operator" for quick access).
+def register():
+    bpy.utils.register_class(CompilerPanel)
+    bpy.utils.register_class(SimpleOperator)
+    bpy.types.VIEW3D_MT_object.append(menu_func)
+
+
+def unregister():
+    bpy.utils.unregister_class(CompilerPanel)
+    bpy.utils.unregister_class(SimpleOperator)
+    bpy.types.VIEW3D_MT_object.remove(menu_func)
+
+
+if __name__ == "__main__":
+    register()
