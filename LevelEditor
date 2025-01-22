@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Blender to Switchball",
     "author": "U live u learn and regret",
-    "version": (3, 0),
+    "version": (3, 2),
     "blender": (4, 2, 0),
     "location": "Properties > Scene > Compilers Panel",
     "description": "Converts blender object data to .vnl for Switchball",
@@ -184,6 +184,267 @@ def Level_Button(context, directory):
     
     # creation functions
     
+    def SetupRotation(obj):
+        # quaternion rotations
+        # kudos to me I fixed the code, it looks so nice right now!
+        for n, vectors in enumerate(obj.rotation_quaternion.to_matrix()):
+            for i, float in enumerate(vectors):
+                # setting up cross vector checks
+                QuatToMatrix = obj.rotation_quaternion.to_matrix()
+                RigX = REXP(QuatToMatrix[0][0])
+                RigY = REXP(QuatToMatrix[0][1])
+                RigZ = REXP(QuatToMatrix[0][2])
+                UpX = REXP(QuatToMatrix[1][0])
+                UpY = REXP(QuatToMatrix[1][1])
+                UpZ = REXP(QuatToMatrix[1][2])
+                ForX = REXP(QuatToMatrix[2][0])
+                ForY = REXP(QuatToMatrix[2][1])
+                ForZ = REXP(QuatToMatrix[2][2])
+                
+                # revamped quaternions
+                # still no free form rotations
+                if direction[n] == 'right' and axis[i] == 'x' and (UpY == 1) and (ForZ == 1):# Facing Forward
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(RigY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(RigZ)+'" ')
+                elif direction[n] == 'up' and axis[i] == 'y' and (RigX == 1) and (ForZ == 1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(UpX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(UpZ)+'" ')
+                elif direction[n] == 'forward' and axis[i] == 'z' and (RigX == 1) and (UpY == 1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(ForX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(ForY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(ForZ)+'" ')
+                elif direction[n] == 'right' and axis[i] == 'y' and (UpX == 1) and (ForZ == 1): # Facing Right
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(RigX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigZ)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(-RigY)+'" ')
+                elif direction[n] == 'up' and axis[i] == 'x' and (RigY == -1) and (ForZ == 1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(UpX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(UpZ)+'" ')
+                elif direction[n] == 'forward' and axis[i] == 'z' and (RigY == -1) and (UpX == 1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(-ForZ)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(ForY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(ForX)+'" ')
+                elif direction[n] == 'right' and axis[i] == 'y' and (UpX == -1) and (ForZ == 1): # Facing Left
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(RigX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigZ)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(-RigY)+'" ')
+                elif direction[n] == 'up' and axis[i] == 'x' and (RigY == 1) and (ForZ == 1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(-UpX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(UpZ)+'" ')
+                elif direction[n] == 'forward' and axis[i] == 'z' and (RigY == 1) and (UpX == -1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(ForZ)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(ForY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(ForX)+'" ')
+                elif direction[n] == 'right' and axis[i] == 'x' and (UpY == -1) and (ForZ == 1): # Facing Backward
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(RigY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(RigZ)+'" ')
+                elif direction[n] == 'up' and axis[i] == 'y' and (RigX == -1) and (ForZ == 1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(UpX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(-UpY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(UpZ)+'" ')
+                elif direction[n] == 'forward' and axis[i] == 'z' and (RigX == -1) and (UpY == -1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(ForX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(ForY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(-ForZ)+'" ')
+                elif direction[n] == 'right' and axis[i] == 'x' and (UpY == -1) and (ForZ == -1):# Facing Forward-
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(RigY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(RigZ)+'" ')
+                elif direction[n] == 'up' and axis[i] == 'y' and (RigX == 1) and (ForZ == -1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(UpX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(UpZ)+'" ')
+                elif direction[n] == 'forward' and axis[i] == 'z' and (RigX == 1) and (UpY == -1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(ForX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(ForY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(ForZ)+'" ')
+                elif direction[n] == 'right' and axis[i] == 'y' and (UpX == 1) and (ForZ == -1): # Facing Right-
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(RigX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigZ)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(RigY)+'" ')
+                elif direction[n] == 'up' and axis[i] == 'x' and (RigY == 1) and (ForZ == -1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(-UpX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(UpZ)+'" ')
+                elif direction[n] == 'forward' and axis[i] == 'z' and (RigY == 1) and (UpX == 1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(-ForZ)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(ForY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(ForX)+'" ')
+                elif direction[n] == 'right' and axis[i] == 'y' and (UpX == -1) and (ForZ == -1): # Facing Left-
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(RigX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigZ)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(RigY)+'" ')
+                elif direction[n] == 'up' and axis[i] == 'x' and (RigY == -1) and (ForZ == -1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(UpX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(UpZ)+'" ')
+                elif direction[n] == 'forward' and axis[i] == 'z' and (RigY == -1) and (UpX == -1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(ForZ)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(ForY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(ForX)+'" ')
+                elif direction[n] == 'right' and axis[i] == 'x' and (UpY == 1) and (ForZ == -1): # Facing Backward-
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(RigY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(RigZ)+'" ')
+                elif direction[n] == 'up' and axis[i] == 'y' and (RigX == -1) and (ForZ == -1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(UpX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(-UpY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(UpZ)+'" ')
+                elif direction[n] == 'forward' and axis[i] == 'z' and (RigX == -1) and (UpY == 1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(ForX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(ForY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(-ForZ)+'" ')
+                elif direction[n] == 'right' and axis[i] == 'z' and (UpY == 1) and (ForX == -1): #Facing Sideways >
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(RigX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(-RigZ)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigY)+'" ')
+                elif direction[n] == 'up' and axis[i] == 'y' and (RigZ == 1) and (ForX == -1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(UpY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(UpZ)+'" ')
+                elif direction[n] == 'forward' and axis[i] == 'x' and (UpY == 1) and (RigZ == 1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(ForZ)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(ForY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(-ForX)+'" ')
+                elif direction[n] == 'right' and axis[i] == 'z' and (UpY == -1) and (ForX == -1): #Facing Sideways > Flipped
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(RigX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(RigZ)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigY)+'" ')
+                elif direction[n] == 'up' and axis[i] == 'y' and (RigZ == -1) and (ForX == -1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(UpY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(UpZ)+'" ')
+                elif direction[n] == 'forward' and axis[i] == 'x' and (UpY == -1) and (RigZ == -1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(ForZ)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(ForY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(ForX)+'" ')
+                elif direction[n] == 'right' and axis[i] == 'y' and (UpZ == -1) and (ForX == -1): #Sideways > Facing front
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(RigX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(-RigY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(RigZ)+'" ')
+                elif direction[n] == 'up' and axis[i] == 'z' and (RigY == 1) and (ForX == -1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(UpX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(UpY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpZ)+'" ')
+                elif direction[n] == 'forward' and axis[i] == 'x' and (UpZ == -1) and (RigY == 1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(-ForX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(ForY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(ForZ)+'" ')
+                elif direction[n] == 'right' and axis[i] == 'y' and (UpZ == 1) and (ForX == -1): #Sideways > Facing back
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(RigX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(RigZ)+'" ')
+                elif direction[n] == 'up' and axis[i] == 'z' and (RigY == -1) and (ForX == -1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(UpX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(UpY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpZ)+'" ')
+                elif direction[n] == 'forward' and axis[i] == 'x' and (UpZ == 1) and (RigY == -1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(-ForX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(ForY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(ForZ)+'" ')
+                elif direction[n] == 'right' and axis[i] == 'z' and (UpY == 1) and (ForX == 1): #Facing Sideways <
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(RigX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(-RigZ)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigY)+'" ')
+                elif direction[n] == 'up' and axis[i] == 'y' and (RigZ == -1) and (ForX == 1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(-UpY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(UpZ)+'" ')
+                elif direction[n] == 'forward' and axis[i] == 'x' and (UpY == 1) and (RigZ == -1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(ForZ)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(ForY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(ForX)+'" ')
+                elif direction[n] == 'right' and axis[i] == 'z' and (UpY == -1) and (ForX == 1): #Facing Sideways < Flipped
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(RigX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(RigZ)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigY)+'" ')
+                elif direction[n] == 'up' and axis[i] == 'y' and (RigZ == 1) and (ForX == 1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(-UpY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(UpZ)+'" ')
+                elif direction[n] == 'forward' and axis[i] == 'x' and (UpY == -1) and (RigZ == 1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(ForZ)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(ForY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(-ForX)+'" ')
+                elif direction[n] == 'right' and axis[i] == 'y' and (RigY == -1) and (ForX == 1): #Sideways < Facing back
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(RigX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(-RigY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(RigZ)+'" ')
+                elif direction[n] == 'up' and axis[i] == 'z' and (UpZ == -1) and (ForX == 1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(UpX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(UpY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpZ)+'" ')
+                elif direction[n] == 'forward' and axis[i] == 'x' and (RigY == -1) and (UpZ == -1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(-ForX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(ForY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(ForZ)+'" ')
+                elif direction[n] == 'right' and axis[i] == 'y' and (RigY == 1) and (ForX == 1): #Sideways < Facing front
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(RigX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(RigZ)+'" ')
+                elif direction[n] == 'up' and axis[i] == 'z' and (UpZ == 1) and (ForX == 1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(UpX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(UpY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(-UpZ)+'" ')
+                elif direction[n] == 'forward' and axis[i] == 'x' and (RigY == 1) and (UpZ == 1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(ForX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(ForY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(ForZ)+'" ')
+                elif direction[n] == 'right' and axis[i] == 'x' and (UpZ == -1) and (ForY == 1): #Top
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(RigY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(RigZ)+'" ')
+                elif direction[n] == 'up' and axis[i] == 'z' and (RigX == 1) and (ForY == 1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(UpX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(UpY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpZ)+'" ')
+                elif direction[n] == 'forward' and axis[i] == 'y' and (RigX == 1) and (UpZ == -1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(ForX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(ForY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(ForZ)+'" ')
+                elif direction[n] == 'right' and axis[i] == 'x' and (UpZ == -1) and (ForY == -1): #Top Flipped
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(RigY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(RigZ)+'" ')
+                elif direction[n] == 'up' and axis[i] == 'z' and (RigX == -1) and (ForY == -1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(UpX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(UpY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpZ)+'" ')
+                elif direction[n] == 'forward' and axis[i] == 'y' and (RigX == -1) and (UpZ == -1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(ForX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(ForY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(ForZ)+'" ')
+                elif direction[n] == 'right' and axis[i] == 'x' and (UpZ == 1) and (ForY == -1): #Bottom
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(RigY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(RigZ)+'" ')
+                elif direction[n] == 'up' and axis[i] == 'z' and (RigX == 1) and (ForY == -1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(UpX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(UpY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpZ)+'" ')
+                elif direction[n] == 'forward' and axis[i] == 'y' and (RigX == 1) and (UpZ == 1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(ForX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(ForY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(ForZ)+'" ')
+                elif direction[n] == 'right' and axis[i] == 'x' and (UpZ == 1) and (ForY == 1): #Bottom Flipped
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(RigY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(RigZ)+'" ')
+                elif direction[n] == 'up' and axis[i] == 'z' and (RigX == -1) and (ForY == 1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(UpX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(UpY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpZ)+'" ')
+                elif direction[n] == 'forward' and axis[i] == 'y' and (RigX == -1) and (UpZ == 1):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(ForX)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(ForY)+'" ')
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(ForZ)+'" ')
+        
+    
     def WritePartialObject(Object):
         # name and ID
         if Object.name.find(".") != -1:
@@ -199,231 +460,7 @@ def Level_Button(context, directory):
             if (Object['id'] != BufferI or Object['id'] != BufferS):
                 CustomLevel.write('id="'+str(Object['id'])+'" ')
             
-        # quaternion rotations
-        # kudos to me I fixed the code, and it looks so nice right now!
-        for n, vectors in enumerate(obj.rotation_quaternion.to_matrix()):
-            for i, float in enumerate(vectors):
-                # setting up cross vector checks
-                QuatToMatrix = obj.rotation_quaternion.to_matrix()
-                RigX = REXP(QuatToMatrix[0][0])
-                RigY = REXP(QuatToMatrix[0][1])
-                RigZ = REXP(QuatToMatrix[0][2])
-                UpX = REXP(QuatToMatrix[1][0])
-                UpY = REXP(QuatToMatrix[1][1])
-                UpZ = REXP(QuatToMatrix[1][2])
-                ForX = REXP(QuatToMatrix[2][0])
-                ForY = REXP(QuatToMatrix[2][1])
-                ForZ = REXP(QuatToMatrix[2][2])
-                
-                if direction[n] == 'right' and axis[i] == 'x' and (RigX == -1 or RigX == 1) and (UpY == -1 or UpY == 1): # forward backward
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(vectors[i+2]))+'" ')
-                else:
-                    if direction[n] == 'right' and axis[i] == 'z' and (RigZ == -1 or RigZ == 1) and (UpY == -1 or UpY == 1): # right left
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'x' and (RigX == -1 or RigX == 1) and (UpZ == -1 or UpZ == 1): # on back on front
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(vectors[i+2]))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'y' and (RigY == -1 or RigY == 1) and (UpX == -1 or UpX == 1): # on side
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'z' and (RigZ == 1) and (UpX == 1): # on back facing right
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(ForX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(-ForY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForZ))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'z' and (RigZ == -1) and (UpX == -1): # on back facing left
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(ForX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(ForY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForZ))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'z' and (RigZ == 1) and (UpX == -1): # on front facing right
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(ForX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(-ForY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForZ))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'z' and (RigZ == -1) and (UpX == 1): # on front facing left
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(ForX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(ForY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForZ))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'x' and (RigY == -1) and (UpZ == 1): # facing right on front
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(UpX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(UpY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(-UpZ))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'x' and (RigY == -1) and (UpZ == -1): # facing right on back
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(UpX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(UpY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(-UpZ))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'x' and (RigY == 1) and (UpZ == -1): # facing left on back
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(UpX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(UpY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(UpZ))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'x' and (RigY == 1) and (UpZ == 1): # facing left on front
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(UpX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(UpY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(UpZ))+'" ')
-                    #implement free form rotation down here later
-                    if direction[n] == 'right' and axis[i] == 'x' and (UpY == -1 or UpY == 1): # free form up upside down rotation
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(vectors[i+2]))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'x' and (RigX == 1) and (UpZ != -1 and UpZ != 1) and (ForY != -1 and ForY != 1): # free form front back rotation
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(vectors[i+2]))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'x' and (ForZ == 1): # free form side rotation
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(vectors[i+2]))+'" ')
-                    #if direction[n] == 'right' and axis[i] == 'x' and (ForY == 1) and (UpX > 0.000001 and UpX < 0.999999): # free form front to right side rotation
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(RigX))+'" ')
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(-RigZ))+'" ')
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(RigY))+'" ')
-                    #if direction[n] == 'right' and axis[i] == 'x' and (ForY == 1) and (UpX < -0.000001 and UpX > -0.999999): # free form front to left side rotation
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(RigX))+'" ')
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(-RigZ))+'" ')
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(RigY))+'" ')
-                        
-                if direction[n] == 'up' and axis[i] == 'y' and (UpY == -1 or UpY == 1): # up upside down
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                    break
-                else:
-                    if direction[n] == 'up' and axis[i] == 'x' and (UpX == -1 or UpX == 1) and (ForY == 0 or ForY == -0): # on side
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(vectors[i+2]))+'" ')
-                    if direction[n] == 'up' and axis[i] == 'z' and (UpZ == -1 or UpZ == 1) and (ForY == -1 or ForY == 1): # on back on front
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    if direction[n] == 'up' and axis[i] == 'x' and (UpX == 1) and (ForY == 1): # on back facing right
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(-RigX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(-RigY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(-RigZ))+'" ')
-                    if direction[n] == 'up' and axis[i] == 'x' and (UpX == -1) and (ForY == 1): # on back facing left
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(-RigX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(-RigY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(RigZ))+'" ')
-                    if direction[n] == 'up' and axis[i] == 'x' and (UpX == -1) and (ForY == -1): # on front facing right
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(-RigX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(RigY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(RigZ))+'" ')
-                    if direction[n] == 'up' and axis[i] == 'x' and (UpX == 1) and (ForY == -1): # on front facing left
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(-RigX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(RigY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(-RigZ))+'" ')
-                    if direction[n] == 'up' and axis[i] == 'z' and (UpZ == 1) and (ForX == -1): # facing right on front
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(-ForX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(ForY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForZ))+'" ')
-                    if direction[n] == 'up' and axis[i] == 'z' and (UpZ == -1) and (ForX == 1): # facing right on back
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(ForX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(ForY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForZ))+'" ')
-                    if direction[n] == 'up' and axis[i] == 'z' and (UpZ == -1) and (ForX == -1): # facing left on back
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(ForX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(ForY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForZ))+'" ')
-                    if direction[n] == 'up' and axis[i] == 'z' and (UpZ == 1) and (ForX == 1): # facing left on front
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(-ForX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(ForY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForZ))+'" ')
-                    #implement free form rotation down here later
-                    if direction[n] == 'up' and axis[i] == 'z' and (RigX == 1) and (UpZ != -1 and UpZ != 1) and (ForY != -1 and ForY != 1): # free form front back rotation
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    if direction[n] == 'up' and axis[i] == 'z' and (ForZ == 1): # free form side rotation
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    #if direction[n] == 'up' and axis[i] == 'z' and (ForY == 1) and (UpX > 0.000001 and UpX < 0.999999): # free form front to right side rotation
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(UpY))+'" ')
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(-UpX))+'" ')
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(UpZ))+'" ')
-                    #if direction[n] == 'up' and axis[i] == 'z' and (ForY == 1) and (UpX < -0.000001 and UpX > -0.999999): # free form front to left side rotation
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(UpY))+'" ')
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(UpX))+'" ')
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(UpZ))+'" ')
-                                
-                if direction[n] == 'forward' and axis[i] == 'z' and (ForZ == -1 or ForZ == 1) and (UpY == -1 or UpY == 1): # forward backward
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    break
-                else:
-                    if direction[n] == 'forward' and axis[i] == 'x' and (ForX == -1 or ForX == 1) and (UpY == -1 or UpY == 1): # right left
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(vectors[i+2]))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'y' and (ForY == -1 or ForY == 1) and (UpZ == -1 or UpZ == 1): # on back on front
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'z' and (ForZ == -1 or ForZ == 1) and (UpX == -1 or UpX == 1): # on back on front
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'y' and (ForY == 1) and (UpX == 1) and (RigZ == 1): # on back facing right
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(UpX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(UpY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(UpZ))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'y' and (ForY == 1) and (UpX == -1) and (RigZ == -1): # on back facing left
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(UpX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(UpY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(UpZ))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'y' and (ForY == -1) and (UpX == -1) and (RigZ == 1): # on front facing right
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(-UpX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(UpY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(UpZ))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'y' and (ForY == -1) and (UpX == 1) and (RigZ == -1): # on front facing left
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(-UpX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(UpY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(UpZ))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'z' and (ForX == -1) and (UpZ == 1): # facing right on front
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(RigX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(RigY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(RigZ))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'z' and (ForX == 1) and (UpZ == -1): # facing right on back
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(RigX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(-RigY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(RigZ))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'z' and (ForX == -1) and (UpZ == -1): # facing left on back
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(RigX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(RigY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(RigZ))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'z' and (ForX == 1) and (UpZ == 1): # facing left on front
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(RigX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(-RigY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(RigZ))+'" ')
-                    #implement free form rotation down here later
-                    if direction[n] == 'forward' and axis[i] == 'z' and (UpY == -1 or UpY == 1): # free form up upside down rotation
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'z' and (RigX == 1) and (UpZ != -1 and UpZ != 1) and (ForY != -1 and ForY != 1): # free form front back rotation
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'z' and (ForZ == 1): # free form side rotation
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    #if direction[n] == 'forward' and axis[i] == 'y' and (ForY == 1) and (UpX > 0.000001 and UpX < 0.999999): # free form front to right side rotation
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(ForX))+'" ')
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForY))+'" ')
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(ForZ))+'" ')
-                    #if direction[n] == 'forward' and axis[i] == 'y' and (ForY == 1) and (UpX < -0.000001 and UpX > -0.999999): # free form front to left side rotation
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(ForX))+'" ')
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForY))+'" ')
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(ForZ))+'" ')
-                    
-                    
-                
+        SetupRotation(Object)
         # location
         CustomLevel.write(str('pos_x="'+str(obj.location.x))+'" ')
         CustomLevel.write(str('pos_y="'+str(obj.location.z))+'" ')
@@ -437,227 +474,7 @@ def Level_Button(context, directory):
         
         CustomLevel.write('id="'+str(num)+'" ')
             
-        for n, vectors in enumerate(obj.rotation_quaternion.to_matrix()):
-            for i, float in enumerate(vectors):
-                # setting up cross vector checks
-                QuatToMatrix = obj.rotation_quaternion.to_matrix()
-                RigX = REXP(QuatToMatrix[0][0])
-                RigY = REXP(QuatToMatrix[0][1])
-                RigZ = REXP(QuatToMatrix[0][2])
-                UpX = REXP(QuatToMatrix[1][0])
-                UpY = REXP(QuatToMatrix[1][1])
-                UpZ = REXP(QuatToMatrix[1][2])
-                ForX = REXP(QuatToMatrix[2][0])
-                ForY = REXP(QuatToMatrix[2][1])
-                ForZ = REXP(QuatToMatrix[2][2])
-                
-                if direction[n] == 'right' and axis[i] == 'x' and (RigX == -1 or RigX == 1) and (UpY == -1 or UpY == 1): # forward backward
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(vectors[i+2]))+'" ')
-                    break
-                else:
-                    if direction[n] == 'right' and axis[i] == 'z' and (RigZ == -1 or RigZ == 1) and (UpY == -1 or UpY == 1): # right left
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'x' and (RigX == -1 or RigX == 1) and (UpZ == -1 or UpZ == 1): # on back on front
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(vectors[i+2]))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'y' and (RigY == -1 or RigY == 1) and (UpX == -1 or UpX == 1): # on side
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'z' and (RigZ == 1) and (UpX == 1): # on back facing right
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(ForX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(-ForY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForZ))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'z' and (RigZ == -1) and (UpX == -1): # on back facing left
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(ForX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(ForY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForZ))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'z' and (RigZ == 1) and (UpX == -1): # on front facing right
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(ForX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(-ForY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForZ))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'z' and (RigZ == -1) and (UpX == 1): # on front facing left
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(ForX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(ForY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForZ))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'x' and (RigY == -1) and (UpZ == 1): # facing right on front
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(UpX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(UpY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(-UpZ))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'x' and (RigY == -1) and (UpZ == -1): # facing right on back
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(UpX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(UpY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(-UpZ))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'x' and (RigY == 1) and (UpZ == -1): # facing left on back
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(UpX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(UpY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(UpZ))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'x' and (RigY == 1) and (UpZ == 1): # facing left on front
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(UpX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(UpY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(UpZ))+'" ')
-                    #implement free form rotation down here later
-                    if direction[n] == 'right' and axis[i] == 'x' and (UpY == -1 or UpY == 1): # free form up upside down rotation
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(vectors[i+2]))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'x' and (RigX == 1) and (UpZ != -1 and UpZ != 1) and (ForY != -1 and ForY != 1): # free form front back rotation
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(vectors[i+2]))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'x' and (ForZ == 1): # free form side rotation
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(vectors[i+2]))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'x' and (ForY == 1) and (UpX > 0.000001 and UpX < 0.999999): # free form front to right side rotation
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(RigX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(-RigZ))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(RigY))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'x' and (ForY == 1) and (UpX < -0.000001 and UpX > -0.999999): # free form front to left side rotation
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(RigX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(-RigZ))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(RigY))+'" ')
-                        
-                if direction[n] == 'up' and axis[i] == 'y' and (UpY == -1 or UpY == 1): # up upside down
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                    break
-                else:
-                    if direction[n] == 'up' and axis[i] == 'x' and (UpX == -1 or UpX == 1) and (ForY == 0 or ForY == -0): # on side
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(vectors[i+2]))+'" ')
-                    if direction[n] == 'up' and axis[i] == 'z' and (UpZ == -1 or UpZ == 1) and (ForY == -1 or ForY == 1): # on back on front
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    if direction[n] == 'up' and axis[i] == 'x' and (UpX == 1) and (ForY == 1): # on back facing right
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(-RigX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(-RigY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(-RigZ))+'" ')
-                    if direction[n] == 'up' and axis[i] == 'x' and (UpX == -1) and (ForY == 1): # on back facing left
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(-RigX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(-RigY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(RigZ))+'" ')
-                    if direction[n] == 'up' and axis[i] == 'x' and (UpX == -1) and (ForY == -1): # on front facing right
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(-RigX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(RigY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(RigZ))+'" ')
-                    if direction[n] == 'up' and axis[i] == 'x' and (UpX == 1) and (ForY == -1): # on front facing left
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(-RigX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(RigY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(-RigZ))+'" ')
-                    if direction[n] == 'up' and axis[i] == 'z' and (UpZ == 1) and (ForX == -1): # facing right on front
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(-ForX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(ForY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForZ))+'" ')
-                    if direction[n] == 'up' and axis[i] == 'z' and (UpZ == -1) and (ForX == 1): # facing right on back
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(ForX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(ForY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForZ))+'" ')
-                    if direction[n] == 'up' and axis[i] == 'z' and (UpZ == -1) and (ForX == -1): # facing left on back
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(ForX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(ForY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForZ))+'" ')
-                    if direction[n] == 'up' and axis[i] == 'z' and (UpZ == 1) and (ForX == 1): # facing left on front
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(-ForX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(ForY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForZ))+'" ')
-                    #implement free form rotation down here later
-                    if direction[n] == 'up' and axis[i] == 'z' and (RigX == 1) and (UpZ != -1 and UpZ != 1) and (ForY != -1 and ForY != 1): # free form front back rotation
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    if direction[n] == 'up' and axis[i] == 'z' and (ForZ == 1): # free form side rotation
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    if direction[n] == 'up' and axis[i] == 'z' and (ForY == 1) and (UpX > 0.000001 and UpX < 0.999999): # free form front to right side rotation
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(UpY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(-UpX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(UpZ))+'" ')
-                    if direction[n] == 'up' and axis[i] == 'z' and (ForY == 1) and (UpX < -0.000001 and UpX > -0.999999): # free form front to left side rotation
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(UpY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(UpX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(UpZ))+'" ')
-                                
-                if direction[n] == 'forward' and axis[i] == 'z' and (ForZ == -1 or ForZ == 1) and (UpY == -1 or UpY == 1): # forward backward
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    break
-                else:
-                    if direction[n] == 'forward' and axis[i] == 'x' and (ForX == -1 or ForX == 1) and (UpY == -1 or UpY == 1): # right left
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(vectors[i+2]))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'y' and (ForY == -1 or ForY == 1) and (UpZ == -1 or UpZ == 1): # on back on front
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'z' and (ForZ == -1 or ForZ == 1) and (UpX == -1 or UpX == 1): # on back on front
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'y' and (ForY == 1) and (UpX == 1) and (RigZ == 1): # on back facing right
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(UpX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(UpY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(UpZ))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'y' and (ForY == 1) and (UpX == -1) and (RigZ == -1): # on back facing left
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(UpX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(UpY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(UpZ))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'y' and (ForY == -1) and (UpX == -1) and (RigZ == 1): # on front facing right
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(-UpX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(UpY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(UpZ))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'y' and (ForY == -1) and (UpX == 1) and (RigZ == -1): # on front facing left
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(-UpX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(UpY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(UpZ))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'z' and (ForX == -1) and (UpZ == 1): # facing right on front
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(RigX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(RigY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(RigZ))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'z' and (ForX == 1) and (UpZ == -1): # facing right on back
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(RigX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(-RigY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(RigZ))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'z' and (ForX == -1) and (UpZ == -1): # facing left on back
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(RigX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(RigY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(RigZ))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'z' and (ForX == 1) and (UpZ == 1): # facing left on front
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(RigX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(-RigY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(RigZ))+'" ')
-                    #implement free form rotation down here later
-                    if direction[n] == 'forward' and axis[i] == 'z' and (UpY == -1 or UpY == 1): # free form up upside down rotation
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'z' and (RigX == 1) and (UpZ != -1 and UpZ != 1) and (ForY != -1 and ForY != 1): # free form front back rotation
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'z' and (ForZ == 1): # free form side rotation
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'y' and (ForY == 1) and (UpX > 0.000001 and UpX < 0.999999): # free form front to right side rotation
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(ForX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(ForZ))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'y' and (ForY == 1) and (UpX < -0.000001 and UpX > -0.999999): # free form front to left side rotation
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(ForX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(ForZ))+'" ')
+        SetupRotation(Object)
                 
         CustomLevel.write(str('pos_x="'+str(Object.location.x))+'" ')
         CustomLevel.write(str('pos_y="'+str(Object.location.z))+'" ')
@@ -678,307 +495,7 @@ def Level_Button(context, directory):
             if (Object['id'] != BufferI or Object['id'] != BufferS):
                 CustomLevel.write('id="'+str(Object['id'])+'" ')
             
-        # quaternion rotations
-        # kudos to me I fixed the code, it looks so nice right now!
-        for n, vectors in enumerate(obj.rotation_quaternion.to_matrix()):
-            for i, float in enumerate(vectors):
-                # setting up cross vector checks
-                QuatToMatrix = obj.rotation_quaternion.to_matrix()
-                RigX = REXP(QuatToMatrix[0][0])
-                RigY = REXP(QuatToMatrix[0][1])
-                RigZ = REXP(QuatToMatrix[0][2])
-                UpX = REXP(QuatToMatrix[1][0])
-                UpY = REXP(QuatToMatrix[1][1])
-                UpZ = REXP(QuatToMatrix[1][2])
-                ForX = REXP(QuatToMatrix[2][0])
-                ForY = REXP(QuatToMatrix[2][1])
-                ForZ = REXP(QuatToMatrix[2][2])
-                
-                if direction[n] == 'right' and axis[i] == 'x' and (RigX == -1 or RigX == 1) and (UpY == -1 or UpY == 1): # forward backward
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(vectors[i+2]))+'" ')
-                    break
-                else:
-                    if direction[n] == 'right' and axis[i] == 'z' and (RigZ == -1 or RigZ == 1) and (UpY == -1 or UpY == 1): # right left
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'x' and (RigX == -1 or RigX == 1) and (UpZ == -1 or UpZ == 1): # on back on front
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(vectors[i+2]))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'y' and (RigY == -1 or RigY == 1) and (UpX == -1 or UpX == 1): # on side
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'z' and (RigZ == 1) and (UpX == 1): # on back facing right
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(ForX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(-ForY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForZ))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'z' and (RigZ == -1) and (UpX == -1): # on back facing left
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(ForX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(ForY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForZ))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'z' and (RigZ == 1) and (UpX == -1): # on front facing right
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(ForX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(-ForY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForZ))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'z' and (RigZ == -1) and (UpX == 1): # on front facing left
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(ForX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(ForY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForZ))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'x' and (RigY == -1) and (UpZ == 1): # facing right on front
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(UpX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(UpY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(-UpZ))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'x' and (RigY == -1) and (UpZ == -1): # facing right on back
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(UpX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(UpY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(-UpZ))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'x' and (RigY == 1) and (UpZ == -1): # facing left on back
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(UpX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(UpY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(UpZ))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'x' and (RigY == 1) and (UpZ == 1): # facing left on front
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(UpX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(UpY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(UpZ))+'" ')
-                    #implement free form rotation down here later
-                    if direction[n] == 'right' and axis[i] == 'x' and (UpY == -1 or UpY == 1): # free form up upside down rotation
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(vectors[i+2]))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'x' and (RigX == 1) and (UpZ != -1 and UpZ != 1) and (ForY != -1 and ForY != 1): # free form front back rotation
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(vectors[i+2]))+'" ')
-                    if direction[n] == 'right' and axis[i] == 'x' and (ForZ == 1): # free form side rotation
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(vectors[i+2]))+'" ')
-                    #if direction[n] == 'right' and axis[i] == 'x' and (ForY == 1) and (UpX > 0.000001 and UpX < 0.999999): # free form front to right side rotation
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(RigX))+'" ')
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(-RigZ))+'" ')
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(RigY))+'" ')
-                    #    continue
-                    #if direction[n] == 'right' and axis[i] == 'x' and (ForY == 1) and (UpX < -0.000001 and UpX > -0.999999): # free form front to left side rotation
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(RigX))+'" ')
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(-RigZ))+'" ')
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(RigY))+'" ')
-                    #    continue
-                        
-                if direction[n] == 'up' and axis[i] == 'y' and (UpY == -1 or UpY == 1): # up upside down
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                    break
-                else:
-                    if direction[n] == 'up' and axis[i] == 'x' and (UpX == -1 or UpX == 1) and (ForY == 0 or ForY == -0): # on side
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(vectors[i+2]))+'" ')
-                    if direction[n] == 'up' and axis[i] == 'z' and (UpZ == -1 or UpZ == 1) and (ForY == -1 or ForY == 1): # on back on front
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    if direction[n] == 'up' and axis[i] == 'x' and (UpX == 1) and (ForY == 1): # on back facing right
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(-RigX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(-RigY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(-RigZ))+'" ')
-                    if direction[n] == 'up' and axis[i] == 'x' and (UpX == -1) and (ForY == 1): # on back facing left
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(-RigX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(-RigY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(RigZ))+'" ')
-                    if direction[n] == 'up' and axis[i] == 'x' and (UpX == -1) and (ForY == -1): # on front facing right
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(-RigX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(RigY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(RigZ))+'" ')
-                    if direction[n] == 'up' and axis[i] == 'x' and (UpX == 1) and (ForY == -1): # on front facing left
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(-RigX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(RigY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(-RigZ))+'" ')
-                    if direction[n] == 'up' and axis[i] == 'z' and (UpZ == 1) and (ForX == -1): # facing right on front
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(-ForX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(ForY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForZ))+'" ')
-                    if direction[n] == 'up' and axis[i] == 'z' and (UpZ == -1) and (ForX == 1): # facing right on back
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(ForX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(ForY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForZ))+'" ')
-                    if direction[n] == 'up' and axis[i] == 'z' and (UpZ == -1) and (ForX == -1): # facing left on back
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(ForX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(ForY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForZ))+'" ')
-                    if direction[n] == 'up' and axis[i] == 'z' and (UpZ == 1) and (ForX == 1): # facing left on front
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(-ForX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(ForY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForZ))+'" ')
-                    #implement free form rotation down here later
-                    if direction[n] == 'up' and axis[i] == 'z' and (RigX == 1) and (UpZ != -1 and UpZ != 1) and (ForY != -1 and ForY != 1): # free form front back rotation
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    if direction[n] == 'up' and axis[i] == 'z' and (ForZ == 1): # free form side rotation
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    #if direction[n] == 'up' and axis[i] == 'z' and (ForY == 1) and (UpX > 0.000001 and UpX < 0.999999): # free form front to right side rotation
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(UpY))+'" ')
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(-UpX))+'" ')
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(UpZ))+'" ')
-                    #    continue
-                    #if direction[n] == 'up' and axis[i] == 'z' and (ForY == 1) and (UpX < -0.000001 and UpX > -0.999999): # free form front to left side rotation
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(UpY))+'" ')
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(UpX))+'" ')
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(UpZ))+'" ')
-                    #    continue
-                                
-                if direction[n] == 'forward' and axis[i] == 'z' and (ForZ == -1 or ForZ == 1) and (UpY == -1 or UpY == 1): # forward backward
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    break
-                else:
-                    if direction[n] == 'forward' and axis[i] == 'x' and (ForX == -1 or ForX == 1) and (UpY == -1 or UpY == 1): # right left
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(vectors[i+2]))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'y' and (ForY == -1 or ForY == 1) and (UpZ == -1 or UpZ == 1): # on back on front
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'z' and (ForZ == -1 or ForZ == 1) and (UpX == -1 or UpX == 1): # on back on front
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'y' and (ForY == 1) and (UpX == 1) and (RigZ == 1): # on back facing right
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(UpX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(UpY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(UpZ))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'y' and (ForY == 1) and (UpX == -1) and (RigZ == -1): # on back facing left
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(UpX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(UpY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(UpZ))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'y' and (ForY == -1) and (UpX == -1) and (RigZ == 1): # on front facing right
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(-UpX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(UpY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(UpZ))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'y' and (ForY == -1) and (UpX == 1) and (RigZ == -1): # on front facing left
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(-UpX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(UpY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(UpZ))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'z' and (ForX == -1) and (UpZ == 1): # facing right on front
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(RigX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(RigY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(RigZ))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'z' and (ForX == 1) and (UpZ == -1): # facing right on back
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(RigX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(-RigY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(RigZ))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'z' and (ForX == -1) and (UpZ == -1): # facing left on back
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(RigX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(RigY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(RigZ))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'z' and (ForX == 1) and (UpZ == 1): # facing left on front
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(RigX))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(-RigY))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(RigZ))+'" ')
-                    #implement free form rotation down here later
-                    if direction[n] == 'forward' and axis[i] == 'z' and (UpY == -1 or UpY == 1): # free form up upside down rotation
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'z' and (RigX == 1) and (UpZ != -1 and UpZ != 1) and (ForY != -1 and ForY != 1): # free form front back rotation
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    if direction[n] == 'forward' and axis[i] == 'z' and (ForZ == 1): # free form side rotation
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                    #if direction[n] == 'forward' and axis[i] == 'y' and (ForY == 1) and (UpX > 0.000001 and UpX < 0.999999): # free form front to right side rotation
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(ForX))+'" ')
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForY))+'" ')
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(ForZ))+'" ')
-                    #    continue
-                    #if direction[n] == 'forward' and axis[i] == 'y' and (ForY == 1) and (UpX < -0.000001 and UpX > -0.999999): # free form front to left side rotation
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(ForX))+'" ')
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForY))+'" ')
-                    #    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(ForZ))+'" ')
-                    #    continue
-                #CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                #RigX, RigY, RigZ = 0,0,0
-                #UpX, UpY, UpZ = 0,0,0
-                #ForX, ForY, ForZ = 0,0,0
-                #if direction[n] == 'up' and axis[i] == 'y':
-                #    UpX = REXP(vectors[i-1])
-                #    UpY = REXP(vectors[i])
-                #    UpZ = REXP(vectors[i+1])
-                #if direction[n] == 'right' and (UpX == -1 or UpX == 1):
-                #    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                #UpY = (direction[n] == 'up' and axis[i] == 'y') and REXP(float)
-                #CustomLevel.write(str(UpY))
-                #CustomLevel.write(str(float))
-                #if direction[n] == 'right' and axis[i] == 'x': # facing any 90 degree angle
-                #    if (REXP(vectors[i]) == -1 or REXP(vectors[i]) == 1) or (REXP(vectors[i+1]) == -1 or REXP(vectors[i+1]) == 1) or (REXP(vectors[i+2]) == -1 or REXP(vectors[i+2]) == 1):
-                #        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                #        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                #        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(vectors[i+2]))+'" ')
-                #    else: # facing decimal proportions
-                #        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                #        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                #        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(vectors[i+2]))+'" ')
-                #if direction[n] == 'up' and axis[i] == 'y': # facing any 90 degree angle
-                #    if (REXP(vectors[i-1]) == -1 or REXP(vectors[i-1]) == 1) or (REXP(vectors[i]) == -1 or REXP(vectors[i]) == 1) or (REXP(vectors[i+1]) == -1 or REXP(vectors[i+1]) == 1):
-                #        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                #        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                #        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                #    else: # facing decimal proportions
-                #        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                #        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                #        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                #if direction[n] == 'forward' and axis[i] == 'z': # facing any 90 degree angle
-                #    if (REXP(vectors[i-2]) == -1 or REXP(vectors[i-2]) == 1) or (REXP(vectors[i-1]) == -1 or REXP(vectors[i-1]) == 1) or (REXP(vectors[i]) == -1 or REXP(vectors[i]) == 1):
-                #        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
-                #        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                #        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                #    else: # facing decimal proportions
-                #        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
-                #        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                #        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                #if direction[n] == 'up' and axis[i] == 'y': # positioned up+ and up-
-                #    if REXP(vectors[i]) != 0:
-                #        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                #        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                #        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                #else:
-                #    if direction[n] == 'up' and axis[i] == 'z': # positioned on front or back
-                #        if (REXP(vectors[i]) == -1 or REXP(vectors[i]) == 1):
-                #            CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
-                #            CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                #            CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                #    if direction[n] == 'up' and axis[i] == 'x': # positioned on side
-                #        if (REXP(vectors[i]) == -1 or REXP(vectors[i]) == 1):
-                #            CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                #            CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                #            CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(vectors[i+2]))+'" ')
-                #if direction[n] == 'forward' and axis[i] == 'z': # facing forward
-                #    if REXP(vectors[i]) != 0:
-                #        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
-                #        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                #        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                #else:
-                #    if direction[n] == 'forward' and axis[i] == 'x': # facing right
-                #        if (REXP(vectors[i]) == -1 or REXP(vectors[i]) == 1):
-                #            CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                #            CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
-                #            CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(vectors[i+2]))+'" ')
-                #    if direction[n] == 'forward' and axis[i] == 'y': # positioned on front or back
-                #        if (REXP(vectors[i]) == -1 or REXP(vectors[i]) == 1):
-                #            CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
-                #            CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
-                #            CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
+        SetupRotation(Object)
         # location
         CustomLevel.write(str('pos_x="'+str(obj.location.x))+'" ')
         CustomLevel.write(str('pos_y="'+str(obj.location.z))+'" ')
