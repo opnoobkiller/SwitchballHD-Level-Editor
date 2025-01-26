@@ -10,6 +10,8 @@ bl_info = {
     "category": "Development",
 }
 
+# do not open SwitchballAssetCreation.Blend for making levels, instead open Level Editor.Blend
+
 import bpy
 from mathutils import Vector
 from bpy.types import Panel, Operator #PropertyGroup
