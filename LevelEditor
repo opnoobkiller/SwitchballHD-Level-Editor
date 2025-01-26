@@ -1,12 +1,12 @@
 bl_info = {
     "name": "Blender to Switchball",
     "author": "U live u learn and regret",
-    "version": (3, 2),
+    "version": (3, 3),
     "blender": (4, 2, 0),
     "location": "Properties > Scene > Compilers Panel",
     "description": "Converts blender object data to .vnl for Switchball",
     "warning": "",
-    "doc_url": "",
+    "doc_url": "https://github.com/opnoobkiller/SwitchballHD-Level-Editor",
     "category": "Development",
 }
 
@@ -102,53 +102,6 @@ def FixMeshes_Button(context):
 def Level_Button(context, directory):
     print(directory)
     CustomLevel=open(directory + '\\CustomLevel.vnl', 'w')
-
-    # rounds negative exponents
-    def RNEXP(float):
-        return round(float, 7)
-    
-    # rounds zero point exponents
-    def REXP(float):
-        return round(float, 6)
-    
-    def CheckRight(direction, axis, value):
-        RoundedValue = (value < 0) and -RNEXP(value) or REXP(value)
-        if (direction == 'up' and axis == 'x' and RoundedValue == float(1)) or (direction == 'up' and axis == 'x' and RoundedValue == float(-1)):
-            return 'x'
-        if (direction == 'up' and axis == 'y' and RoundedValue == float(1)) or (direction == 'up' and axis == 'y' and RoundedValue == float(-1)):
-            return 'y'
-        if (direction == 'up' and axis == 'z' and RoundedValue == float(1)) or (direction == 'up' and axis == 'z' and RoundedValue == float(-1)):
-            return 'z'
-    
-    def CheckUp(direction, axis, value):
-        RoundedValue = REXP(value)
-        if (direction == 'up' and axis == 'x' and RoundedValue == 1) or (direction == 'up' and axis == 'x' and RoundedValue == -1):
-            return 'x'
-        if (direction == 'up' and axis == 'y' and RoundedValue == 1) or (direction == 'up' and axis == 'y' and RoundedValue == -1):
-            return 'y'
-        if (direction == 'up' and axis == 'z' and RoundedValue == 1) or (direction == 'up' and axis == 'z' and RoundedValue == -1):
-            return 'z'
-    
-    def CheckForward(direction, axis, value):
-        RoundedValue = (value < 0) and -RNEXP(value) or REXP(value)
-        if (direction == 'up' and axis == 'x' and RoundedValue == float(1)) or (direction == 'up' and axis == 'x' and RoundedValue == float(-1)):
-            return 'x'
-        if (direction == 'up' and axis == 'y' and RoundedValue == float(1)) or (direction == 'up' and axis == 'y' and RoundedValue == float(-1)):
-            return 'y'
-        if (direction == 'up' and axis == 'z' and RoundedValue == float(1)) or (direction == 'up' and axis == 'z' and RoundedValue == float(-1)):
-            return 'z'
-    
-    def CheckOne(value):
-        if REXP(value) == float(1):
-            return True
-        else:
-            return False
-    
-    def CheckNegOne(value):
-        if REXP(value) == float(-1):
-            return True
-        else:
-            return False
          
     axis = ['x','y','z']
     direction = ['right','up','forward']
@@ -157,9 +110,6 @@ def Level_Button(context, directory):
     RigX, RigY, RigZ = 0,0,0
     UpX, UpY, UpZ = 0,0,0
     ForX, ForY, ForZ = 0,0,0
-
-    Neg_zero = -4.371138828673793e-08
-    Neg_one = -1.1920928955078125e-07
     
     # you can only have a maximum number of 65535 id's so 65535 objects
     # here are the reservations
@@ -183,6 +133,12 @@ def Level_Button(context, directory):
     # nor  any of the other aformentioned objects
     
     # creation functions
+    
+    def CheckDoubleRotation(rot1, rot2):
+        if (rot1 != 1 and rot1 != -1 and rot1 != 0 and rot1 != -0) and (rot2 != 1 and rot2 != -1 and rot2 != 0 and rot2 != -0):
+            return True
+        else:
+            return False
     
     def SetupRotation(obj):
         # quaternion rotations
@@ -443,6 +399,31 @@ def Level_Button(context, directory):
                     CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(ForX)+'" ')
                     CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(ForY)+'" ')
                     CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(ForZ)+'" ')
+                # free form rotation, left and right only...
+                if (direction[n] == 'right' and axis[i] == 'x' and CheckDoubleRotation(RigX, RigY) and (RigY < 0)): # rot left
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="'+str(-RigX)+'" '))
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="'+str(RigZ)+'" '))
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="'+str(RigY)+'" '))
+                if (direction[n] == 'up' and axis[i] == 'y' and CheckDoubleRotation(UpX, UpY) and (RigY < 0)):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="'+str(ForX)+'" '))
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="'+str(ForZ)+'" '))
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="'+str(ForY)+'" '))
+                if (direction[n] == 'forward' and axis[i] == 'z' and CheckDoubleRotation(RigX, RigY) and CheckDoubleRotation(UpX, UpY) and (RigY < 0)):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="'+str(UpX)+'" '))
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="'+str(ForY)+'" '))
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="'+str(-UpY)+'" '))
+                if (direction[n] == 'right' and axis[i] == 'x' and CheckDoubleRotation(RigX, RigY) and (RigY > 0)): # rot right
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="'+str(RigX)+'" '))
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="'+str(RigZ)+'" '))
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="'+str(RigY)+'" '))
+                if (direction[n] == 'up' and axis[i] == 'y' and CheckDoubleRotation(UpX, UpY) and (RigY > 0)):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="'+str(ForX)+'" '))
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="'+str(ForZ)+'" '))
+                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="'+str(ForY)+'" '))
+                if (direction[n] == 'forward' and axis[i] == 'z' and CheckDoubleRotation(RigX, RigY) and CheckDoubleRotation(UpX, UpY) and (RigY > 0)):
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="'+str(UpX)+'" '))
+                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="'+str(ForY)+'" '))
+                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="'+str(UpY)+'" '))
         
     
     def WritePartialObject(Object):
@@ -580,6 +561,11 @@ def Level_Button(context, directory):
                 Buffer = 60001
                 if (checkpoint_id) and (checkpoint_id != Buffer):
                     CustomLevel.write(str('\n\t\t\t<param name="checkpoint_id" value='+'"'+str(checkpoint_id)+'" data_type="int" />'))
+            
+            def AttachedTo():
+                Buffer = 60001
+                if (attached_to_id) and (attached_to_id != Buffer):
+                    CustomLevel.write(str('\n\t\t\t<param name="attached_to_id" value='+'"'+str(attached_to_id)+'" data_type="int" />'))
             
             def BehaviourOptional(val):
                 if behaviour:
@@ -756,9 +742,41 @@ def Level_Button(context, directory):
             
             if Object.name.find(".") != -1:
                 Object.name = obj.name[:-4]
-            
+            # Barrels
             if ("BARREL_SMALL" in Object.name or "BARREL_MEDIUM" in Object.name or "BARREL_LARGE" in Object.name):
                 val = ""
+                GenericDynamicOptional(val)
+                RespawnOptional(val)
+            # Boards
+            if ("BOARD_CURVED" in Object.name or "BOARD_LARGE" in Object.name or "BOARD_MEDIUM" in Object.name or "BOARD_SMALL" in Object.name or "BOARD_ONE_FIT" in Object.name or "BOARD_QUAD_FIT" in Object.name):
+                val = ""
+                GenericDynamicOptional(val)
+                RespawnOptional(val)
+            # Cannonballs
+            if ("CANNONBALL" in Object.name):
+                val = ""
+                GenericDynamicOptional(val)
+                RespawnOptional(val)
+            # Magnet in rope
+            if ("MAGNET_IN_ROPE" in Object.name):
+                val = ""
+                GenericDynamicOptional(val)
+                RespawnOptional(val)
+            # Planks
+            if ("PLANK" in Object.name):
+                val = ""
+                GenericDynamicOptional(val)
+                RespawnOptional(val)
+            # Stoneballs
+            if ("STONEBALL" in Object.name):
+                val = ""
+                GenericDynamicOptional(val)
+                RespawnOptional(val)
+            # Wood crates
+            if ("WOODCRATE" in Object.name):
+                val = ""
+                GenericDynamicOptional(val)
+                RespawnOptional(val)
             
             if ("CANNON_FOOT" in Object.name):
                 val = ""
@@ -773,6 +791,11 @@ def Level_Button(context, directory):
                         break
                 CustomLevel.write(str('\n\t\t\t<param name="active_on_startup" value='+'"'+val+'" data_type="bool" />'))
                 
+            if ("LEVEL_FINISH_POINT" in Object.name):
+                val = ""
+                GenericDynamicOptional(val)
+                RespawnOptional(val)
+                
             if ("CLOTH_FITPOINT" in Object.name):
                 val = ""
                 clothfitpoint_behaviour_set = ['hanging', 'stretched'] # string
@@ -783,11 +806,7 @@ def Level_Button(context, directory):
                         break
                 CustomLevel.write(str('\n\t\t\t<param name="behaviour" value='+'"'+val+'" data_type="string" />'))
                 
-                for index, value in enumerate(Object['dynamic'].to_list()):
-                    if (value == True):
-                        val = bool_dynamic_set[index]
-                        break
-                CustomLevel.write(str('\n\t\t\t<param name="dynamic" value='+'"'+val+'" data_type="bool" />'))
+                GenericDynamicOptional(val)
                 
                 for index, value in enumerate(Object['first_fitpoint'].to_list()):
                     if (value == True):
@@ -800,11 +819,7 @@ def Level_Button(context, directory):
                 if (next_fitpoint_id == "+1"):
                     CustomLevel.write(str('\n\t\t\t<param name="next_fitpoint_id" value='+'"'+str(num+1)+'" data_type="int" />'))
                 
-                for index, value in enumerate(Object['respawn'].to_list()):
-                    if (value == True):
-                        val = respawn_set[index]
-                        break
-                CustomLevel.write(str('\n\t\t\t<param name="respawn" value='+'"'+val+'" data_type="bool" />'))
+                RespawnOptional(val)
             
             if ("FAN" in Object.name or "FLOORFAN" in Object.name):
                 val = ""
@@ -997,6 +1012,19 @@ def Level_Button(context, directory):
         
         CustomLevel.write('\n\t\t</properties>')
         
+        # upon compiling, the spawnpoint will change mesh to the selected ball
+        if ("PLAYER_SPAWNPOINT" in Object.name):
+            val = ""
+            Default = 'PLAYER_SPAWNPOINT'
+            Balls = ['AIRBALL', 'MARBLEBALL', 'POWERBALL', 'STEELBALL']
+            for index, value in enumerate(Object['default_ball'].to_list()):
+                if (value == True):
+                    val = Balls[index]
+                    break
+                else:
+                    Object.data = bpy.data.meshes[str(Default)]
+            Object.data = bpy.data.meshes[str(val)]
+        
         if (Object.get("sign") is not None):
             if (Object['sign'] == "FAN"): #checks for FAN to spawn fan propeller
                 CustomLevel.write('\n\t\t<object type="FAN_PROPELLER" right_x="-1.0" right_y="0.0" right_z="0.0" up_x="0.0" up_y="1.0" up_z="0.0" forward_x="0.0" forward_y="0.0" forward_z="-1.0" pos_x="0" pos_y="0.5" pos_z="-0.329998" />')
@@ -1074,12 +1102,19 @@ def Level_Button(context, directory):
                 CustomLevel.write('\n\t\t<param name="point_light_type" value="'+val+'" data_type="string" />')
             if worldtype:
                 val = ""
+                Default = 'Blank'
+                Worlds = ['Skyworld', 'Iceworld', 'Caveworld', 'Cloudworld', 'Lavaworld']
                 for index, value in enumerate(level['world_type'].to_list()):
                     if (value == True):
                         val = world_type_set[index]
                         break
                 CustomLevel.write('\n\t\t<param name="world_type" value="'+val+'" data_type="string" />')
-        
+                for index, value in enumerate(level['world_type'].to_list()):
+                    if (value == True):
+                        val = Worlds[index]
+                        break
+                bpy.context.scene.world = bpy.data.worlds[str(val)]
+                
         level = bpy.data.collections['level'] #REQUIRED!
         blue = level.get('point_light_blue')
         green = level.get('point_light_green')
