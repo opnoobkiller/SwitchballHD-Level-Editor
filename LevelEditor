@@ -1,19 +1,24 @@
 bl_info = {
     "name": "Blender to Switchball",
     "author": "U live u learn and regret",
-    "version": (3, 3),
+    "version": (3, 0),
     "blender": (4, 2, 0),
     "location": "Properties > Scene > Compilers Panel",
     "description": "Converts blender object data to .vnl for Switchball",
     "warning": "",
-    "doc_url": "https://github.com/opnoobkiller/SwitchballHD-Level-Editor",
+    "doc_url": "",
     "category": "Development",
 }
 
-# do not open SwitchballAssetCreation.Blend for making levels, instead open Level Editor.Blend
-
 import bpy
-from mathutils import Vector
+import re
+import math
+from pathlib import Path
+from collections import OrderedDict
+from functools import lru_cache
+from bpy_extras.io_utils import ImportHelper
+from mathutils import Vector, Euler, Matrix
+from math import degrees, asin, acos, sin
 from bpy.types import Panel, Operator #PropertyGroup
 from bpy.props import StringProperty # EnumProperty, PointerProperty
 
@@ -93,6 +98,553 @@ from bpy.props import StringProperty # EnumProperty, PointerProperty
 
 #classes = [MyProperties, Blender_to_Switchball_PT_show_property, Blender_to_Switchball_OT_make_property, Blender_to_Switchball_OT_select_object]
 
+class LevelObject:
+    def __init__(self, contents) : self.contents = contents
+
+class PlayerSpawnpoints:
+    Instances = 0
+    
+    def __init__(self) : pass
+    
+    @classmethod
+    def AddInstances(cls, num) : cls.Instances = num
+
+class Bridges:
+    Instances = 0
+    
+    def __init__(self) : pass
+    
+    @classmethod
+    def AddInstances(cls, num) : cls.Instances = num
+
+class Poles:
+    Instances = 0
+    
+    def __init__(self) : pass
+    
+    @classmethod
+    def AddInstances(cls, num) : cls.Instances = num
+
+class Waypoints:
+    Instances = 0
+    
+    def __init__(self) : pass
+    
+    @classmethod
+    def AddInstances(cls, num) : cls.Instances = num
+
+class Checkpoints:
+    Instances = 0
+    
+    def __init__(self) : pass
+    
+    @classmethod
+    def AddInstances(cls, num) : cls.Instances = num
+
+class Morphs:
+    Instances = 0
+    
+    def __init__(self) : pass
+    
+    @classmethod
+    def AddInstances(cls, num) : cls.Instances = num
+
+class Pumps:
+    Instances = 0
+    
+    def __init__(self) : pass
+    
+    @classmethod
+    def AddInstances(cls, num) : cls.Instances = num
+
+class Gyrocopters:
+    Instances = 0
+    
+    def __init__(self) : pass
+    
+    @classmethod
+    def AddInstances(cls, num) : cls.Instances = num
+
+class Generators:
+    Instances = 0
+    
+    def __init__(self) : pass
+    
+    @classmethod
+    def AddInstances(cls, num) : cls.Instances = num
+
+class Woodcrates:
+    Instances = 0
+    
+    def __init__(self) : pass
+    
+    @classmethod
+    def AddInstances(cls, num) : cls.Instances = num
+
+class Metalcrates:
+    Instances = 0
+    
+    def __init__(self) : pass
+    
+    @classmethod
+    def AddInstances(cls, num) : cls.Instances = num
+
+class Platforms:
+    Instances = 0
+    
+    def __init__(self) : pass
+    
+    @classmethod
+    def AddInstances(cls, num) : cls.Instances = num
+        
+class Rails:
+    Instances = 0
+    
+    def __init__(self) : pass
+    
+    @classmethod
+    def AddInstances(cls, num) : cls.Instances = num
+
+class LevelProperty:
+    Instance = 0
+    point_light_blue = 0
+    point_light_green = 0
+    point_light_red = 0
+    point_light_range = 0
+    point_light_type = ""
+    world_type = ""
+    
+    def __init__(self, contents):
+        self.contents = contents
+        LevelProperty.AddInstance()
+    
+    @classmethod
+    def AddProperties(cls, blue, green, red, range, light, world):
+        cls.point_light_blue = int(blue)
+        cls.point_light_green = int(green)
+        cls.point_light_red = int(red)
+        cls.point_light_range = int(range)
+        cls.point_light_type = light
+        cls.world_type = world
+    
+    @classmethod
+    def AddInstance(cls) : cls.Instance += 1
+
+class BallOption:
+    Option = 0
+    
+    def __init__(self) : pass
+    
+    @classmethod
+    def ResetOption(cls) : cls.Option = 0
+    
+    @classmethod
+    def MorphCall(cls, ball):
+        def SwitchMorphIndex(Ball, Number):
+                    match Ball:
+                        case "powerball" : return cls.Option
+                        case "marbleball" : return Number + 1
+                        case "airball" : return Number + 2
+                        case "steelball" : return Number + 3
+                        case _ : return cls.Option
+        cls.Option = SwitchMorphIndex(ball, cls.Option)
+
+def SetupPosition(obj, pos_x, pos_y, pos_z):
+    obj.location = [float(pos_x), float(pos_z), float(pos_y)]
+
+def SetupRotation(obj, rigx, rigy, rigz, upx, upy, upz, forx, fory, forz): # fix for importing
+    f = float
+    Quat_90 = 0.7071067690849304
+    Quat = [f(rigx), f(rigy), f(rigz)], [f(upx), f(upy), f(upz)], [f(forx), f(fory), f(forz)] # how switchball sees rotations, gonna keep it simple for now
+    matrix = Matrix(Quat)
+    print(obj.name)
+    print(matrix)
+    if (matrix[0][0] == 1) and (matrix[1][1] == 1) and (matrix[2][2] == 1): # Default rotation
+        pass
+    elif (matrix[0][0] == -1) and (matrix[1][1] == 1) and (matrix[2][2] == -1): # Default rotation but 180 degrees
+        obj.rotation_quaternion[0] =  0
+        obj.rotation_quaternion[3] = -1
+    elif (matrix[0][2] == -1) and (matrix[1][1] == 1) and (matrix[2][0] == 1): # 90 on Blender Z
+        obj.rotation_quaternion[0] = Quat_90
+        obj.rotation_quaternion[3] =  -Quat_90
+    elif (matrix[0][2] == 1) and (matrix[1][1] == 1) and (matrix[2][0] == -1): # -90 on Blender Z
+        obj.rotation_quaternion[0] = Quat_90
+        obj.rotation_quaternion[3] =  Quat_90
+        
+def CompileRotationFixed(File, rigx, rigy, rigz, upx, upy, upz, forx, fory, forz, Quat):
+    equivalent_90 = 0.7071070075035095
+    right = ['right_x=', 'right_y=', 'right_z=']
+    up = ['up_x=', 'up_y=', 'up_z=']
+    forward = ['forward_x=', 'forward_y=', 'forward_z=']
+    r, u, f = 0,1,2
+    x, y, z = 0,1,2
+    iter = {0,1}
+    Matrix = [[rigx, rigy, rigz], [upx, upy, upz], [forx, fory, forz]]
+    EX = '{:f}'
+    
+        # work with 9x9 matrix for free form rotations below
+    if ((Matrix[r][x] != 1.0 and Matrix[r][x] != -1.0) and (Matrix[u][y] == 1.0) and (Matrix[f][z] != 1.0 and Matrix[f][z] != -1.0)): # rotating around the Y Axis
+        Matrix[u][x], Matrix[f][x] = Matrix[f][x], Matrix[u][x]
+        for index, string in enumerate(right):
+            for vector, matrice in enumerate(Matrix[index]):
+                File.write(f'{right[index]}"'+EX.format(Matrix[index][vector])+'" ')
+                break
+        Matrix[r][x], Matrix[r][z] = Matrix[r][z], Matrix[r][x]
+        Matrix[u][x], Matrix[r][z] = Matrix[r][z], Matrix[u][x]
+        for index, string in enumerate(up):
+            for vector, matrice in enumerate(Matrix[index]):
+                File.write(f'{up[index]}"'+EX.format(Matrix[index][vector])+'" ')
+                break
+        Matrix[r][x], Matrix[r][y] = Matrix[r][y], Matrix[r][x]
+        Matrix[u][x], Matrix[u][z] = Matrix[u][z], Matrix[u][x]
+        Matrix[f][x], Matrix[u][y] = Matrix[u][y], Matrix[f][x] ## stopped here
+        for index, string in enumerate(forward):
+            for vector, matrice in enumerate(Matrix[index]):
+                File.write(f'{forward[index]}"'+EX.format(Matrix[index][vector])+'" ')
+                break
+    
+    if ((Matrix[r][x] == 1.0) and (Matrix[u][y] != -1.0 and Matrix[u][y] != 1.0) and (Matrix[f][z] != 1.0 and Matrix[f][z] != -1.0)): # rotating around the X axis
+        for index, string in enumerate(right):
+            for vector, matrice in enumerate(Matrix[index]):
+                File.write(f'{right[index]}"'+EX.format(Matrix[index][vector])+'" ')
+                break
+        Matrix[r][x], Matrix[r][z] = Matrix[r][z], Matrix[r][x]
+        Matrix[u][x], Matrix[u][y] = Matrix[u][y], Matrix[u][x]
+        Matrix[f][x], Matrix[u][z] = Matrix[u][z], Matrix[f][x]
+        for index, string in enumerate(up):
+            for vector, matrice in enumerate(Matrix[index]):
+                File.write(f'{up[index]}"'+EX.format(Matrix[index][vector])+'" ')
+                break
+        Matrix[u][x], Matrix[f][y] = Matrix[f][y], Matrix[u][x]
+        Matrix[f][x], Matrix[f][y] = Matrix[f][y], Matrix[f][x]
+        for index, string in enumerate(forward):
+            for vector, matrice in enumerate(Matrix[index]):
+                File.write(f'{forward[index]}"'+EX.format(Matrix[index][vector])+'" ')
+                break
+    
+    if ((Matrix[r][x] != 1.0 and Matrix[r][x] != -1.0) and (Matrix[u][y] != 1.0 and Matrix[u][y] != -1.0) and (Matrix[f][z] == 1.0)): # rotating around the Z axis
+        Matrix[r][y], Matrix[f][z] = Matrix[f][z], Matrix[r][y]
+        Matrix[u][x], Matrix[f][y] = Matrix[f][y], Matrix[u][x]
+        Matrix[f][z], Matrix[f][x] = Matrix[f][x], -Matrix[f][z]
+        for index, string in enumerate(right):
+            for vector, matrice in enumerate(Matrix[index]):
+                File.write(f'{right[index]}"'+EX.format(Matrix[index][vector])+'" ')
+                break
+        Matrix[r][y], Matrix[u][x] = Matrix[u][x], Matrix[r][y]
+        Matrix[r][x], Matrix[r][y] = Matrix[r][y], Matrix[r][x]
+        Matrix[f][x], Matrix[f][z] = Matrix[f][z], Matrix[f][z]
+        for index, string in enumerate(up):
+            for vector, matrice in enumerate(Matrix[index]):
+                File.write(f'{up[index]}"'+EX.format(Matrix[index][vector])+'" ')
+                break
+        Matrix[r][x], Matrix[f][y] = -Matrix[f][y], Matrix[r][x]
+        Matrix[u][x], Matrix[u][z] = Matrix[u][z], Matrix[u][x]
+        Matrix[f][x], Matrix[u][y] = Matrix[u][y], Matrix[f][x]
+        for index, string in enumerate(forward):
+            for vector, matrice in enumerate(Matrix[index]):
+                File.write(f'{forward[index]}"'+EX.format(Matrix[index][vector])+'" ')
+                break
+    #end
+        
+    if (Matrix[r][x] == 1.0 and Matrix[u][y] == 1.0 and Matrix[f][z] == 1.0): # default forward
+        for index, string in enumerate(right):
+            for vector, matrice in enumerate(Matrix[index]):
+                File.write(f'{right[index]}"'+'{:.1f}'.format(Matrix[index][vector])+'" ')
+                break
+        
+        for index, string in enumerate(up):
+            for vector, matrice in enumerate(Matrix[index]):
+                if vector == 2: break
+                if vector != 1: continue
+                File.write(f'{up[index]}"'+'{:.1f}'.format(Matrix[index][vector])+'" ')
+        
+        for index, string in enumerate(forward):
+            for vector, matrice in enumerate(Matrix[index]):
+                if vector != 2: continue
+                File.write(f'{forward[index]}"'+'{:.1f}'.format(Matrix[index][vector])+'" ')
+    
+    if (Matrix[r][x] == -1.0 and Matrix[u][y] == -1.0 and Matrix[f][z] == 1.0): # default backwards
+        for index, string in enumerate(right):
+            for vector, matrice in enumerate(Matrix[index]):
+                File.write(f'{right[index]}"'+'{:.1f}'.format(Matrix[index][vector])+'" ')
+                break
+        
+        for index, string in enumerate(up):
+            for vector, matrice in enumerate(Matrix[index]):
+                if vector == 2: break
+                if vector != 1: continue
+                File.write(f'{up[index]}"'+'{:.1f}'.format(-Matrix[index][vector])+'" ')
+        
+        for index, string in enumerate(forward):
+            for vector, matrice in enumerate(Matrix[index]):
+                if vector != 2: continue
+                File.write(f'{forward[index]}"'+'{:.1f}'.format(-Matrix[index][vector])+'" ')
+    
+    if (round(Matrix[r][y], 2) == -1.0 and round(Matrix[u][x], 2) == 1.0 and Matrix[f][z] == 1.0): # default right
+        for index, string in enumerate(right):
+            for vector, matrice in enumerate(Matrix[index]):
+                if vector != 2: continue
+                File.write(f'{right[index]}"'+'{:.1f}'.format(Matrix[index][vector])+'" ')
+        
+        for index, string in enumerate(up):
+            for vector, matrice in enumerate(Matrix[index]):
+                if vector >= 1: break
+                File.write(f'{up[index]}"'+'{:.1f}'.format(Matrix[index][vector])+'" ')
+        
+        for index, string in enumerate(forward):
+            for vector, matrice in enumerate(Matrix[index]):
+                if vector == 0: continue
+                if vector == 2: break
+                File.write(f'{forward[index]}"'+'{:.1f}'.format(Matrix[index][vector])+'" ')
+    
+    if (round(Matrix[r][y], 2) == 1.0 and round(Matrix[u][x], 2) == -1.0 and Matrix[f][z] == 1.0): # default left
+        for index, string in enumerate(right):
+            for vector, matrice in enumerate(Matrix[index]):
+                if vector != 2: continue
+                File.write(f'{right[index]}"'+'{:.1f}'.format(-Matrix[index][vector])+'" ')
+        
+        for index, string in enumerate(up):
+            for vector, matrice in enumerate(Matrix[index]):
+                if vector >= 1: break
+                File.write(f'{up[index]}"'+'{:.1f}'.format(-Matrix[index][vector])+'" ')
+        
+        for index, string in enumerate(forward):
+            for vector, matrice in enumerate(Matrix[index]):
+                if vector == 0: continue
+                if vector == 2: break
+                File.write(f'{forward[index]}"'+'{:.1f}'.format(Matrix[index][vector])+'" ')
+        
+    if (Matrix[r][x] == 1.0 and round(Matrix[u][z], 2) == -1.0 and round(Matrix[f][y], 2) == 1.0): # laying face up
+        for index, string in enumerate(right):
+            for vector, matrice in enumerate(Matrix[index]):
+                File.write(f'{right[index]}"'+'{:.1f}'.format(Matrix[index][vector])+'" ')
+                break
+        
+        for index, string in enumerate(up):
+            for vector, matrice in enumerate(Matrix[index]):
+                if vector == 2: break
+                if vector != 1: continue
+                File.write(f'{up[index]}"'+'{:.1f}'.format(-Matrix[index][vector])+'" ')
+        
+        for index, string in enumerate(forward):
+            for vector, matrice in enumerate(Matrix[index]):
+                if vector != 2: continue
+                File.write(f'{forward[index]}"'+'{:.1f}'.format(-Matrix[index][vector])+'" ')
+    
+    if (Matrix[r][x] == 1.0 and round(Matrix[u][z], 2) == 1.0 and round(Matrix[f][y], 2) == -1.0): # laying face back
+        for index, string in enumerate(right):
+            for vector, matrice in enumerate(Matrix[index]):
+                File.write(f'{right[index]}"'+'{:.1f}'.format(Matrix[index][vector])+'" ')
+                break
+        
+        for index, string in enumerate(up):
+            for vector, matrice in enumerate(Matrix[index]):
+                if vector == 2: break
+                if vector != 1: continue
+                File.write(f'{up[index]}"'+'{:.1f}'.format(-Matrix[index][vector])+'" ')
+        
+        for index, string in enumerate(forward):
+            for vector, matrice in enumerate(Matrix[index]):
+                if vector != 2: continue
+                File.write(f'{forward[index]}"'+'{:.1f}'.format(-Matrix[index][vector])+'" ')
+    
+    if (Matrix[r][x] == 1.0 and Matrix[u][y] == -1.0 and Matrix[f][z] == -1.0): # laying upside down
+        for index, string in enumerate(right):
+            for vector, matrice in enumerate(Matrix[index]):
+                File.write(f'{right[index]}"'+'{:.1f}'.format(Matrix[index][vector])+'" ')
+                break
+        
+        for index, string in enumerate(up):
+            for vector, matrice in enumerate(Matrix[index]):
+                if vector == 2: break
+                if vector != 1: continue
+                File.write(f'{up[index]}"'+'{:.1f}'.format(-Matrix[index][vector])+'" ')
+        
+        for index, string in enumerate(forward):
+            for vector, matrice in enumerate(Matrix[index]):
+                if vector != 2: continue
+                File.write(f'{forward[index]}"'+'{:.1f}'.format(-Matrix[index][vector])+'" ')
+    
+    if (round(Matrix[r][z], 2) == -1.0 and Matrix[u][y] == 1.0 and round(Matrix[f][x], 2) == 1.0): # laying right side
+        for index, string in enumerate(right):
+            for vector, matrice in enumerate(Matrix[index]):
+                if vector == 2: break
+                if vector != 1: continue
+                File.write(f'{right[index]}"'+'{:.1f}'.format(Matrix[index][vector])+'" ')
+        
+        for index, string in enumerate(up):
+            for vector, matrice in enumerate(Matrix[index]):
+                if vector != 2: continue
+                File.write(f'{up[index]}"'+'{:.1f}'.format(Matrix[index][vector])+'" ')
+        
+        for index, string in enumerate(forward):
+            for vector, matrice in enumerate(Matrix[index]):
+                File.write(f'{forward[index]}"'+'{:.1f}'.format(Matrix[index][vector])+'" ')
+                break
+    
+    if (round(Matrix[r][x], 2) == -1.0 and Matrix[u][y] == 1.0 and round(Matrix[f][z], 2) == -1.0): # laying right side down
+        for index, string in enumerate(right):
+            for vector, matrice in enumerate(Matrix[index]):
+                File.write(f'{right[index]}"'+'{:.1f}'.format(-Matrix[index][vector])+'" ')
+                break
+        
+        for index, string in enumerate(up):
+            for vector, matrice in enumerate(Matrix[index]):
+                if vector != 1: continue
+                if vector == 2: break
+                File.write(f'{up[index]}"'+'{:.1f}'.format(-Matrix[index][vector])+'" ')
+        
+        for index, string in enumerate(forward):
+            for vector, matrice in enumerate(Matrix[index]):
+                if vector != 2: continue
+                File.write(f'{forward[index]}"'+'{:.1f}'.format(Matrix[index][vector])+'" ')
+                
+    
+    #if ((Quat[0] == equivalent_90 and Quat[3] == equivalent_90) or (Quat[0] == equivalent_90 and Quat[3] == -equivalent_90)): # default right and left
+    #    #SwapMatrix(Matrix, r, r, x, y, Matrix[r][x], Matrix[r][y])
+    #    for index, string in enumerate(right):
+    #        for vector, matrice in enumerate(Matrix[index]):
+    #            if vector != 0: break
+    #            SwapMatrix(Matrix, r, r, x, y, Matrix[r][x], Matrix[r][y])
+                #File.write(f'{right[index]}"{Matrix[index][vector]}" ')
+        
+    #    for index, string in enumerate(up):
+    #        for vector, matrice in enumerate(Matrix[index]):
+    #            if vector == 2: break
+    #            if vector != 1: continue
+                #Matrix = SwapMatrix(Matrix, u, u, x, y, Matrix[u][x], Matrix[u][y])
+    #            File.write(f'{up[index]}"{Matrix[index][vector]}" ')
+        
+    #    for index, string in enumerate(forward):
+    #        for vector, matrice in enumerate(Matrix[index]):
+    #            if vector != 2: continue
+    #            File.write(f'{forward[index]}"{Matrix[index][vector]}" ')
+                #SwapMatrix(Matrix, r, r, x, y, Matrix[r][x], Matrix[r][y])
+    
+
+def CompileRotation(File, rigx, rigy, rigz, upx, upy, upz, forx, fory, forz, Quat): # fix for compiling
+    Quat_90 = 0.7071067690849304
+    aligned = False
+    
+    def GetAligned():
+        if ((rigx == 1 or rigx == -1) and (rigy == 1 or rigy == -1) and (forz == 1 or forz == -1)):
+            aligned = True
+        elif ((rigy == 1 or rigy == -1) and (upx == 1 or upx == -1) and (forz == 1 or forz == -1)):
+            aligned = True
+        else:
+            aligned = False
+        print(aligned)
+    
+    #print(rigx,rigy,rigz,upx,upy,upz,forx,fory,forz)
+    
+    
+    if (Quat[0] == 1): # forward, backward around z
+        File.write(f'right_x="{rigx}" ')
+        File.write(f'right_y="{round(rigy)}" ')
+        File.write(f'right_z="{round(rigz)}" ')
+        File.write(f'up_x="{round(upx)}" ')
+        File.write(f'up_y="{upy}" ')
+        File.write(f'up_z="{round(upz)}" ')
+        File.write(f'forward_x="{round(forx)}" ')
+        File.write(f'forward_y="{round(fory)}" ')
+        File.write(f'forward_z="{forz}" ')
+    elif (Quat[3] == -1): # default rotation with 180 degree
+        File.write(f'right_x="{rigx}" ')
+        File.write(f'right_y="{round(rigy)}" ')
+        File.write(f'right_z="{round(rigz)}" ')
+        File.write(f'up_x="{round(upx)}" ')
+        File.write(f'up_y="{-upy}" ')
+        File.write(f'up_z="{round(upz)}" ')
+        File.write(f'forward_x="{round(forx)}" ')
+        File.write(f'forward_y="{round(fory)}" ')
+        File.write(f'forward_z="{-forz}" ')
+    elif (Quat[1] == -1):
+        File.write(f'right_x="{rigx}" ')
+        File.write(f'right_y="{round(rigy)}" ')
+        File.write(f'right_z="{round(rigz)}" ')
+        File.write(f'up_x="{round(upx)}" ')
+        File.write(f'up_y="{forz}" ') # switched
+        File.write(f'up_z="{round(upz)}" ')
+        File.write(f'forward_x="{round(forx)}" ')
+        File.write(f'forward_y="{round(fory)}" ')
+        File.write(f'forward_z="{upy}" ') # switched
+    elif (Quat[0] == Quat_90 and Quat[1] == -Quat_90) or (Quat[0] == Quat_90 and Quat[1] == Quat_90): # forward, backward around y
+        File.write(f'right_x="{rigx}" ')
+        File.write(f'right_y="{rigy}" ')
+        File.write(f'right_z="{rigz}" ')
+        File.write(f'up_x="{forx}" ')
+        File.write(f'up_y="{forz}" ')
+        File.write(f'up_z="{-fory}" ')
+        File.write(f'forward_x="{upx}" ')
+        File.write(f'forward_y="{-upz}" ')
+        File.write(f'forward_z="{upy}" ')
+    
+    if (Quat[0] == Quat_90 and Quat[2] == Quat_90): # forward backward around x
+        File.write(f'right_x="{rigx}" ')
+        File.write(f'right_y="{rigz}" ')
+        File.write(f'right_z="{round(rigy)}" ')
+        File.write(f'up_x="{upy}" ')
+        File.write(f'up_y="{upx}" ')
+        File.write(f'up_z="{round(upz)}" ')
+        File.write(f'forward_x="{round(forz)}" ')
+        File.write(f'forward_y="{round(fory)}" ')
+        File.write(f'forward_z="{forx}" ')
+    elif (Quat[0] == Quat_90 and Quat[2] == -Quat_90):
+        File.write(f'right_x="{rigx}" ')
+        File.write(f'right_y="{-rigz}" ')
+        File.write(f'right_z="{round(rigy)}" ')
+        File.write(f'up_x="{-upy}" ')
+        File.write(f'up_y="{upx}" ')
+        File.write(f'up_z="{round(upz)}" ')
+        File.write(f'forward_x="{round(forz)}" ')
+        File.write(f'forward_y="{round(fory)}" ')
+        File.write(f'forward_z="{forx}" ')
+    
+    if ((Quat[0] == Quat_90 and Quat[3] == Quat_90) or (Quat[0] == Quat_90 and Quat[3] == -Quat_90)): # left, right around z
+        File.write(f'right_x="{round(rigx)}" ')
+        File.write(f'right_y="{rigz}" ')
+        File.write(f'right_z="{-round(rigy)}" ')
+        File.write(f'up_x="{forx}" ')
+        File.write(f'up_y="{forz}" ')
+        File.write(f'up_z="{fory}" ')
+        File.write(f'forward_x="{-round(upx)}" ')
+        File.write(f'forward_y="{upz}" ')
+        File.write(f'forward_z="{round(upy)}" ')
+        
+    if (Quat[0] <= 1 and ((Quat[3] != Quat_90 and Quat[3] != -Quat_90) and Quat[3] > 0)): # free rotation around Z Blender axis
+        GetAligned()
+        if ((round(rigy) == 1 or round(rigy) == -1) and (rigy == -1 or rigy == 1) and aligned == True):
+            File.write(f'right_x="{round(rigx)}" ')
+        else:
+            File.write(f'right_x="{rigx}" ')
+        File.write(f'right_y="{rigz}" ')
+        if ((round(rigy) == 1 or round(rigy) == -1) and (rigy == -1 or rigy == 1) and aligned == True):
+            File.write(f'right_z="{round(-rigy)}" ')
+        else:
+            File.write(f'right_z="{-rigy}" ')
+        File.write(f'up_x="{forx}" ')
+        File.write(f'up_y="{forz}" ')
+        File.write(f'up_z="{fory}" ')
+        if ((round(forz) == 1 or round(forz) == -1) and (rigy == -1 or rigy == 1) and aligned == True):
+            File.write(f'forward_x="{round(-upx)}" ')
+        else:
+            File.write(f'forward_x="{-upx}" ')
+        File.write(f'forward_y="{upz}" ')
+        if ((round(forz) == 1 or round(forz) == -1) and (rigy == -1 or rigy == 1) and aligned == True):
+            File.write(f'forward_z="{round(upy)}" ')
+        else:
+            File.write(f'forward_z="{upy}" ')
+        #CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
+        #CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
+
+def find_user_asset_directory():
+    user_lib_index = bpy.context.preferences.filepaths.asset_libraries.find("Experimental Assets")
+    if user_lib_index == -1:
+        return None
+    
+    user_asset_library = bpy.context.preferences.filepaths.asset_libraries[user_lib_index]
+    return user_asset_library.path
+
 def FixNames_Button(context):
     for index, reference in enumerate(bpy.data.collections['Reference'].all_objects):
         if reference.name.find(".") != -1:
@@ -100,10 +652,1338 @@ def FixNames_Button(context):
 
 def FixMeshes_Button(context):
     bpy.ops.outliner.orphans_purge() # the most effective way
+    
+def Open_Level_Button(context, file): # sets up classes and full strings from slices
+    LevelFile = LevelObject([])
+    LevelFull = ''
+    LevelProperties = LevelProperty([])
+    BufferI = 60001
+    BufferS = 50001
+    ball = BallOption()
+    playerspawnpoints = PlayerSpawnpoints()
+    bridges = Bridges()
+    poles = Poles()
+    waypoints = Waypoints()
+    checkpoints = Checkpoints()
+    morphs = Morphs()
+    pumps = Pumps()
+    gyrocopters = Gyrocopters()
+    generators = Generators()
+    woodcrates = Woodcrates()
+    metalcrates = Metalcrates()
+    platforms = Platforms()
+    rails = Rails()
+    PropertiesFull = ''
+    Level=open(file, 'r')
+    string = ''
+    user_asset_dir = find_user_asset_directory()
+    print(user_asset_dir)
+    file_path = Path(user_asset_dir) / "SwitchballAssetCreation.blend"
+    
+    for block in bpy.data.meshes:
+        bpy.data.meshes.remove(block)
+    
+    for block in bpy.data.images:
+        if block.users == 0:
+            bpy.data.images.remove(block)
+    
+    for block in bpy.data.materials:
+        if block.users == 0:
+            bpy.data.materials.remove(block)
+    
+    # if you encounter this error, please tell me about it
+    if not file_path.exists():
+        raise ValueError({'ERROR'}, f"File not found: {file_path}")
+        return {'CANCELLED'}
+    
+    def setup_dynamic(obj, dynamic):
+        match dynamic:
+            case "default" : obj['dynamic'][0] = True
+            case "true" : obj['dynamic'][1] = True
+            case "false" : obj['dynamic'][2] = True
+            case _ : obj['dynamic'][0] = True
+    
+    def setup_respawn(obj, respawn):
+        match respawn:
+            case "true":
+                obj['respawn'][0] = True
+            case "false":
+                obj['respawn'][1] = True
+            case _:
+                obj['respawn'][1] = True
+    
+    def disable_ball_option(obj_option):
+        for num, ball in enumerate(obj_option) : obj_option[ball] = False
+    
+    # Resets string variable for reuse
+    def resetstr(string) -> str:
+        NewString = ''
+        return NewString
+    
+    # Specify a given range, and break/return to get the exact value
+    def GetValueAtLength(start, end, TargetString, Use=None, UseSelf=None, SelfString=None) -> str:
+        ThisString = ''
+        if Use == 'y':
+            for index in range(start, end):
+                if (ThisString.find(TargetString)):
+                    return ThisString
+                ThisString += LevelFull[index]  
+        if UseSelf == 'y':
+            if SelfString != None:
+                for index in range(start, end):
+                    if (TargetString in ThisString) : return ThisString[:-1]
+                    ThisString += SelfString[index]
+        for index in range(start, end):
+            if (TargetString in ThisString):
+                return ThisString
+            ThisString += LevelFile.contents[index]
+        
+    # User specific
+    def GetWorldValueAtLength(start, end, EndString) -> str:
+        ThisString = ''
+        for index in range(start, end):
+            if (EndString in ThisString):
+                return ThisString[:-1]
+            ThisString += PropertiesString[index]
+    
+    # User specific Deprecated
+    def GetNameValueAtLength(start, end, EndString) -> str:
+        ThisString = ''
+        for index in range(start, end):
+            if (EndString in ThisString):
+                return ThisString[:-1]
+            ThisString += LevelFile.contents[index]
+    
+    def GetPositionAtLength(String, TargetString, start=None) -> str:
+        if (type(start) == int) : return String.find(TargetString, start)
+        else : return String.find(TargetString)
+            
+    # String expression specific
+    def GetValueAtExpressionLength(start, end, ExpressionString, UseSelf=None, SelfString=None) -> str:
+        ThisString = ''
+        if UseSelf == 'y':
+            if SelfString != None:
+                for index in range(start, end):
+                    if (re.search(ExpressionString, ThisString)):
+                            return ThisString[:-1]
+                    ThisString += SelfString[index]
+        for index in range(start, end):
+            if (re.search(ExpressionString, ThisString)):
+                return ThisString[:-1]
+            ThisString += LevelFile.contents[index]
+    
+    # appends the level and property slices to a class
+    for s, ss in enumerate(Level.read()):
+        LevelFile.contents.append(ss)
+    
+    PropertiesString = GetValueAtLength(12, 486, '</properties>')
+    
+    for s, ss in enumerate(PropertiesString):
+        LevelProperties.contents.append(ss)
+    
+    #setting up properties for property object
+    param_blue = GetPositionAtLength(PropertiesString, '<param name="point_light_blue"')
+    param_blue = GetPositionAtLength(PropertiesString, 'value="', param_blue+31)
+    param_green = GetPositionAtLength(PropertiesString, '<param name="point_light_green"')
+    param_green = GetPositionAtLength(PropertiesString, 'value="', param_green+32)
+    param_red = GetPositionAtLength(PropertiesString, '<param name="point_light_red"')
+    param_red = GetPositionAtLength(PropertiesString, 'value="', param_red+30)
+    param_range = GetPositionAtLength(PropertiesString, '<param name="point_light_range"')
+    param_range = GetPositionAtLength(PropertiesString, 'value="', param_range+32)
+    param_light_type = GetPositionAtLength(PropertiesString, '<param name="point_light_type"')
+    param_light_type = GetPositionAtLength(PropertiesString, 'value="', param_light_type+31)
+    param_world_type = GetPositionAtLength(PropertiesString, '<param name="world_type"')
+    param_world_type = GetPositionAtLength(PropertiesString, 'value="', param_world_type+25)
+    
+    pointlightblue = GetValueAtExpressionLength(param_blue+7, param_blue+16, r'\d"', 'y', PropertiesString)
+    pointlightgreen = GetValueAtExpressionLength(param_green+7, param_green+16, r'\d"', 'y', PropertiesString)
+    pointlightrange = GetValueAtExpressionLength(param_range+7, param_range+16, r'\d"', 'y', PropertiesString)
+    pointlightred = GetValueAtExpressionLength(param_red+7, param_red+16, r'\d"', 'y', PropertiesString)
+    pointlighttype = GetValueAtLength(param_light_type+7, param_light_type+16, 'normal"', None, 'y', PropertiesString)
+    worldtype = GetWorldValueAtLength(param_world_type+7, param_world_type+64, 'd"')
+    
+    LevelProperty.AddProperties(pointlightblue, pointlightgreen, pointlightred, pointlightrange, pointlighttype, worldtype)
+    
+    # gets the full strings from the class slices
+    for s, ss in enumerate(LevelFile.contents):
+        LevelFull += ss
+    
+    for s, ss in enumerate(LevelProperties.contents):
+        PropertiesFull += ss
+    
+    # helper for generic objects, generic objects sets up positions and rotations only, while the object itself sets up the special properties in it.
+    LevelFileIndex = 0
+    LevelFileIndexList = []
+    for s, ss in enumerate(LevelFile.contents):
+        LevelFileIndexList.append(s)
+        #print(s)
+    
+    PlayerSpawnpoints.AddInstances(LevelFull.count("PLAYER_SPAWNPOINT"))
+    Bridges.AddInstances(LevelFull.count("BRIDGE"))
+    Poles.AddInstances(LevelFull.count("POLE"))
+    Waypoints.AddInstances(LevelFull.count("WAYPOINT"))
+    Checkpoints.AddInstances(LevelFull.count("CHECKPOINT"))
+    Morphs.AddInstances(LevelFull.count("MORPH"))
+    Pumps.AddInstances(LevelFull.count("PUMP"))
+    Gyrocopters.AddInstances(LevelFull.count("GYROCOPTER"))
+    Generators.AddInstances(LevelFull.count("GENERATOR"))
+    Woodcrates.AddInstances(LevelFull.count("WOODCRATE"))
+    Metalcrates.AddInstances(LevelFull.count("METALCRATE"))
+    Platforms.AddInstances(LevelFull.count("PLATFORM"))
+    Rails.AddInstances(LevelFull.count("RAIL"))
+    
+    def ReadPlayerSpawnpoints():
+        if PlayerSpawnpoints.Instances == 0:
+            return
+        setattr(playerspawnpoints, 'data', OrderedDict())
+        for i in range(PlayerSpawnpoints.Instances):
+            i += 1
+            if (i == 1):
+                start = GetPositionAtLength(LevelFull, '<object type="PLAYER_SPAWNPOINT', None)
+                end = GetPositionAtLength(LevelFull, 't>', start)
+                #print(start, end)
+            else:
+                start = GetPositionAtLength(LevelFull, '<object type="PLAYER_SPAWNPOINT', playerspawnpoints.data['Where'] + 1)
+                end = GetPositionAtLength(LevelFull, 't>', start)
+            playerspawnpoints.data['Where'] = start
+            playerspawnpoints.data['WhereToEnd'] = end
+            TempPlayerSpawnpoint = ''
+            playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"] = ''
+            
+            # Fixed with a buffer of 2 on the end string
+            for index in range(start, end+2):
+                playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"] += LevelFull[index]
+                #print(LevelFull[index])
+            
+            for index in range(0, len(playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"])):
+                #print(playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"])
+                playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_name_start"] = GetPositionAtLength(playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"], 'type=', None)
+                namestart = playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_name_start"]
+                playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_name"] = GetValueAtLength(namestart+6, namestart+128, '"', None, 'y', playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"])
+                playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_name"] = GetValueAtLength(namestart+6, namestart+50, '"', None, 'y', playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"])
+                playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_posx_start"] = GetPositionAtLength(playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"], 'pos_x=', None)
+                playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_posy_start"] = GetPositionAtLength(playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"], 'pos_y=', None)
+                playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_posz_start"] = GetPositionAtLength(playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"], 'pos_z=', None)
+                playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_airball_can_spawn_start"] = GetPositionAtLength(playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"], 'airball_can_spawn', None)
+                playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_checkpoint_id_start"] = GetPositionAtLength(playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"], 'checkpoint_id', None)
+                playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_default_ball_start"] = GetPositionAtLength(playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"], 'default_ball', None)
+                playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_dynamic_start"] = GetPositionAtLength(playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"], 'dynamic', None)
+                playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_first_spawnpoint_start"] = GetPositionAtLength(playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"], 'first_spawnpoint', None)
+                playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_marbleball_can_spawn_start"] = GetPositionAtLength(playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"], 'marbleball_can_spawn', None)
+                playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_order_number_start"] = GetPositionAtLength(playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"], 'order_number', None)
+                playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_powerball_can_spawn_start"] = GetPositionAtLength(playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"], 'powerball_can_spawn', None)
+                playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_respawn_start"] = GetPositionAtLength(playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"], 'respawn', None)
+                playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_steelball_can_spawn_start"] = GetPositionAtLength(playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"], 'steelball_can_spawn', None)
+                PosXStart = playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_posx_start"]
+                PosYStart = playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_posy_start"]
+                PosZStart = playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_posz_start"]
+                Airball_Can_Spawn_Start = playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_airball_can_spawn_start"]
+                Checkpoint_Id_Start = playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_checkpoint_id_start"]
+                Default_Ball_Start = playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_default_ball_start"]
+                Dynamic_Start = playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_dynamic_start"]
+                First_Spawnpoint_Start = playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_first_spawnpoint_start"]
+                Marbleball_Can_Spawn_Start = playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_marbleball_can_spawn_start"]
+                Order_Number_Start = playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_order_number_start"]
+                Powerball_Can_Spawn_Start = playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_powerball_can_spawn_start"]
+                Respawn_Start = playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_respawn_start"]
+                Steelball_Can_Spawn_Start = playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_steelball_can_spawn_start"]
+                
+                playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_posx"] = GetValueAtExpressionLength(PosXStart+7, PosXStart+64, r'-?\d+\.?\d*"', 'y', playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"])
+                playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_posy"] = GetValueAtExpressionLength(PosYStart+7, PosYStart+64, r'-?\d+\.?\d*"', 'y', playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"])
+                playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_posz"] = GetValueAtExpressionLength(PosZStart+7, PosZStart+64, r'-?\d+\.?\d*"', 'y', playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"])
+                playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_airball_can_spawn"] = GetValueAtExpressionLength(Airball_Can_Spawn_Start+26, Airball_Can_Spawn_Start+32, r'[e]"', 'y', playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"])
+                playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_checkpoint_id"] = GetValueAtExpressionLength(Checkpoint_Id_Start+22, Checkpoint_Id_Start+28, r'\d+"', 'y', playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"])
+                playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_default_ball"] = GetValueAtExpressionLength(Default_Ball_Start+21, Default_Ball_Start+32, r'airball"|marbleball"|powerball"|steelball"', 'y', playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"])
+                playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_dynamic"] = GetValueAtExpressionLength(Dynamic_Start+16, Dynamic_Start+24, r'[t]"|[e]"', 'y', playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"])
+                playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_first_spawnpoint"] = GetValueAtExpressionLength(First_Spawnpoint_Start+25, First_Spawnpoint_Start+31, r'[e]"', 'y', playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"])
+                playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_marbleball_can_spawn"] = GetValueAtExpressionLength(Marbleball_Can_Spawn_Start+29, Marbleball_Can_Spawn_Start+35, r'[e]"', 'y', playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"])
+                playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_order_number"] = GetValueAtExpressionLength(Order_Number_Start+21, Order_Number_Start+27, r'\d+"', 'y', playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"])
+                playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_powerball_can_spawn"] = GetValueAtExpressionLength(Powerball_Can_Spawn_Start+28, Powerball_Can_Spawn_Start+34, r'[e]"', 'y', playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"])
+                playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_respawn"] = GetValueAtExpressionLength(Respawn_Start+16, Respawn_Start+22, r'[e]"', 'y', playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"])
+                playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_steelball_can_spawn"] = GetValueAtExpressionLength(Steelball_Can_Spawn_Start+28, Steelball_Can_Spawn_Start+34, r'[e]"', 'y', playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"])
+                PosX = playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_posx"]
+                PosY = playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_posy"]
+                PosZ = playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_posz"]
+                AirballCanSpawn = (str.capitalize(playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_airball_can_spawn"]) == "True") and True or False 
+                CheckpointId = playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_checkpoint_id"]
+                DefaultBall = playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_default_ball"]
+                Dynamic = playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_dynamic"]
+                First_Spawnpoint = (str.capitalize(playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_first_spawnpoint"]) == "True") and True or False
+                MarbleballCanSpawn = (str.capitalize(playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_marbleball_can_spawn"]) == "True") and True or False
+                OrderNumber = playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_order_number"]
+                PowerballCanSpawn = (str.capitalize(playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_powerball_can_spawn"]) == "True") and True or False
+                Respawn = (str.capitalize(playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_respawn"]) == "True") and True or False
+                SteelballCanSpawn = (str.capitalize(playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_steelball_can_spawn"]) == "True") and True or False
+            with bpy.data.libraries.load(str(file_path)) as (data_from, data_to):
+                for name in data_from.objects:
+                    if name == playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}_name"]:
+                        data_to.objects = [name]
+            
+            level = bpy.data.collections['level']
+            
+            for obj in data_to.objects:
+                SetupPosition(obj, PosX, PosY, PosZ)
+                if AirballCanSpawn:
+                    obj['airball_can_spawn'][0] = True
+                    obj['airball_can_spawn'][1] = False
+                else:
+                    obj['airball_can_spawn'][0] = False
+                    obj['airball_can_spawn'][1] = True
+                    
+                if int(CheckpointId) != BufferI and int(CheckpointId) <= BufferI:
+                    obj['checkpoint_id'] = BufferI+1
+                else:
+                    obj['checkpoint_id'] = int(CheckpointId)
+                    
+                if DefaultBall == "airball":
+                    obj['default_ball'][0] = True
+                    obj['default_ball'][1] = False
+                elif DefaultBall == "marbleball":
+                    obj['default_ball'][1] = True
+                elif DefaultBall == "powerball":
+                    obj['default_ball'][1] = False
+                    obj['default_ball'][2] = True
+                elif DefaultBall == "steelball":
+                    obj['default_ball'][1] = False
+                    obj['default_ball'][3] = True
+                    
+                setup_dynamic(obj, Dynamic)
+                
+                if First_Spawnpoint:
+                    obj['first_spawnpoint'][0] = True
+                    obj['first_spawnpoint'][1] = False
+                else:
+                    obj['first_spawnpoint'][0] = False
+                    obj['first_spawnpoint'][1] = True
+                
+                if MarbleballCanSpawn:
+                    obj['marbleball_can_spawn'][0] = True
+                    obj['marbleball_can_spawn'][1] = False
+                else:
+                    obj['marbleball_can_spawn'][0] = False
+                    obj['marbleball_can_spawn'][1] = True
+                
+                obj['order_number'] = int(OrderNumber)
+                
+                if PowerballCanSpawn:
+                    obj['powerball_can_spawn'][0] = True
+                    obj['powerball_can_spawn'][1] = False
+                else:
+                    obj['powerball_can_spawn'][0] = False
+                    obj['powerball_can_spawn'][1] = True
+                
+                setup_respawn(obj, Respawn)
+                
+                if SteelballCanSpawn: # Steel Ball Run
+                    obj['steelball_can_spawn'][0] = True
+                    obj['steelball_can_spawn'][1] = False
+                else:
+                    obj['steelball_can_spawn'][0] = False
+                    obj['steelball_can_spawn'][1] = True
+                
+                level.objects.link(obj)
+    
+    def ReadBridges():
+        if Bridges.Instances == 0:
+            return
+        setattr(bridges, 'data', OrderedDict())
+        for i in range(Bridges.Instances):
+            i += 1
+            if (i == 1):
+                start = GetPositionAtLength(LevelFull, '<object type="BRIDGE', None)
+                end = GetPositionAtLength(LevelFull, '/>', start)
+                #print(start, end) debugs the start and end of the very first bridge
+            else:
+                start = GetPositionAtLength(LevelFull, '<object type="BRIDGE', bridges.data['Where'] + 1)
+                end = GetPositionAtLength(LevelFull, '/>', start)
+            bridges.data['Where'] = start
+            bridges.data['WhereToEnd'] = end
+            TempBridge = ''
+            bridges.data[f"BRIDGE_{i}"] = ''
+            
+            # Fixed with a buffer of 2 on the end string
+            for index in range(start, end+2):
+                bridges.data[f"BRIDGE_{i}"] += LevelFull[index]
+                #print(LevelFull[index])
+            
+            for index in range(0, len(bridges.data[f"BRIDGE_{i}"])):
+                bridges.data[f"BRIDGE_{i}_name_start"] = GetPositionAtLength(bridges.data[f"BRIDGE_{i}"], 'type=', None)
+                namestart = bridges.data[f"BRIDGE_{i}_name_start"]
+                bridges.data[f"BRIDGE_{i}_name"] = GetValueAtLength(namestart+6, namestart+128, '"', None, 'y', bridges.data[f"BRIDGE_{i}"])
+                bridges.data[f"BRIDGE_{i}_name"] = GetValueAtLength(namestart+6, namestart+50, '"', None, 'y', bridges.data[f"BRIDGE_{i}"])
+                PosXStart = GetPositionAtLength(bridges.data[f"BRIDGE_{i}"], 'pos_x=', None)
+                PosYStart = GetPositionAtLength(bridges.data[f"BRIDGE_{i}"], 'pos_y=', None)
+                PosZStart = GetPositionAtLength(bridges.data[f"BRIDGE_{i}"], 'pos_z=', None)
+                RigXStart = GetPositionAtLength(bridges.data[f"BRIDGE_{i}"], 'right_x=', None)
+                RigYStart = GetPositionAtLength(bridges.data[f"BRIDGE_{i}"], 'right_y=', None)
+                RigZStart = GetPositionAtLength(bridges.data[f"BRIDGE_{i}"], 'right_z=', None)
+                UpXStart = GetPositionAtLength(bridges.data[f"BRIDGE_{i}"], 'up_x=', None)
+                UpYStart = GetPositionAtLength(bridges.data[f"BRIDGE_{i}"], 'up_y=', None)
+                UpZStart = GetPositionAtLength(bridges.data[f"BRIDGE_{i}"], 'up_z=', None)
+                ForXStart = GetPositionAtLength(bridges.data[f"BRIDGE_{i}"], 'forward_x=', None)
+                ForYStart = GetPositionAtLength(bridges.data[f"BRIDGE_{i}"], 'forward_y=', None)
+                ForZStart = GetPositionAtLength(bridges.data[f"BRIDGE_{i}"], 'forward_z=', None)
+                
+                PosX = GetValueAtExpressionLength(PosXStart+7, PosXStart+64, r'-?\d+\.?\d*"', 'y', bridges.data[f"BRIDGE_{i}"])
+                PosY = GetValueAtExpressionLength(PosYStart+7, PosYStart+64, r'-?\d+\.?\d*"', 'y', bridges.data[f"BRIDGE_{i}"])
+                PosZ = GetValueAtExpressionLength(PosZStart+7, PosZStart+64, r'-?\d+\.?\d*"', 'y', bridges.data[f"BRIDGE_{i}"])
+                RigX = GetValueAtExpressionLength(RigXStart+9, RigXStart+64, r'-?\d+\.?\d*"', 'y', bridges.data[f"BRIDGE_{i}"])
+                RigY = GetValueAtExpressionLength(RigYStart+9, RigYStart+64, r'-?\d+\.?\d*"', 'y', bridges.data[f"BRIDGE_{i}"])
+                RigZ = GetValueAtExpressionLength(RigZStart+9, RigZStart+64, r'-?\d+\.?\d*"', 'y', bridges.data[f"BRIDGE_{i}"])
+                UpX = GetValueAtExpressionLength(UpXStart+6, UpXStart+64, r'-?\d+\.?\d*"', 'y', bridges.data[f"BRIDGE_{i}"])
+                UpY = GetValueAtExpressionLength(UpYStart+6, UpYStart+64, r'-?\d+\.?\d*"', 'y', bridges.data[f"BRIDGE_{i}"])
+                UpZ = GetValueAtExpressionLength(UpZStart+6, UpZStart+64, r'-?\d+\.?\d*"', 'y', bridges.data[f"BRIDGE_{i}"])
+                ForX = GetValueAtExpressionLength(ForXStart+11, ForXStart+64, r'-?\d+\.?\d*"', 'y', bridges.data[f"BRIDGE_{i}"])
+                ForY = GetValueAtExpressionLength(ForYStart+11, ForYStart+64, r'-?\d+\.?\d*"', 'y', bridges.data[f"BRIDGE_{i}"])
+                ForZ = GetValueAtExpressionLength(ForZStart+11, ForZStart+64, r'-?\d+\.?\d*"', 'y', bridges.data[f"BRIDGE_{i}"])
+                
+            with bpy.data.libraries.load(str(file_path)) as (data_from, data_to):
+                for name in data_from.objects:
+                    if name == bridges.data[f"BRIDGE_{i}_name"]:
+                        data_to.objects = [name]
+            
+            level = bpy.data.collections['level']
+            
+            for obj in data_to.objects:
+                SetupPosition(obj, PosX, PosY, PosZ)
+                #print(bridges.data[f"BRIDGE_{i}"])
+                #print(RigX, UpY, ForZ)
+                SetupRotation(obj, RigX, RigY, RigZ, UpX, UpY, UpZ, ForX, ForY, ForZ)
+                level.objects.link(obj)
+    
+    def ReadPoles():
+        if Poles.Instances == 0:
+            return
+        setattr(poles, 'data', OrderedDict())
+        for i in range(Poles.Instances):
+            i += 1
+            if (i == 1):
+                start = GetPositionAtLength(LevelFull, '<object type="POLE', None)
+                end = GetPositionAtLength(LevelFull, '/>', start)
+                #print(start, end)
+            else:
+                start = GetPositionAtLength(LevelFull, '<object type="POLE', poles.data['Where'] + 1)
+                end = GetPositionAtLength(LevelFull, '/>', start)
+            poles.data['Where'] = start
+            poles.data['WhereToEnd'] = end
+            TempPole = ''
+            poles.data[f"POLE_{i}"] = ''
+            
+            # Fixed with a buffer of 2 on the end string
+            for index in range(start, end+2):
+                poles.data[f"POLE_{i}"] += LevelFull[index]
+                #print(LevelFull[index])
+            
+            for index in range(0, len(poles.data[f"POLE_{i}"])):
+                poles.data[f"POLE_{i}_name_start"] = GetPositionAtLength(poles.data[f"POLE_{i}"], 'type=', None)
+                namestart = poles.data[f"POLE_{i}_name_start"]
+                poles.data[f"POLE_{i}_name"] = GetValueAtLength(namestart+6, namestart+128, '"', None, 'y', poles.data[f"POLE_{i}"])
+                poles.data[f"POLE_{i}_name"] = GetValueAtLength(namestart+6, namestart+50, '"', None, 'y', poles.data[f"POLE_{i}"])
+                poles.data[f"POLE_{i}_posx_start"] = GetPositionAtLength(poles.data[f"POLE_{i}"], 'pos_x=', None)
+                poles.data[f"POLE_{i}_posy_start"] = GetPositionAtLength(poles.data[f"POLE_{i}"], 'pos_y=', None)
+                poles.data[f"POLE_{i}_posz_start"] = GetPositionAtLength(poles.data[f"POLE_{i}"], 'pos_z=', None)
+                PosXStart = poles.data[f"POLE_{i}_posx_start"]
+                PosYStart = poles.data[f"POLE_{i}_posy_start"]
+                PosZStart = poles.data[f"POLE_{i}_posz_start"]
+                
+                poles.data[f"POLE_{i}_posx"] = GetValueAtExpressionLength(PosXStart+7, PosXStart+64, r'-?\d+\.?\d*"', 'y', poles.data[f"POLE_{i}"])
+                poles.data[f"POLE_{i}_posy"] = GetValueAtExpressionLength(PosYStart+7, PosYStart+64, r'-?\d+\.?\d*"', 'y', poles.data[f"POLE_{i}"])
+                poles.data[f"POLE_{i}_posz"] = GetValueAtExpressionLength(PosZStart+7, PosZStart+64, r'-?\d+\.?\d*"', 'y', poles.data[f"POLE_{i}"])
+                PosX = poles.data[f"POLE_{i}_posx"]
+                PosY = poles.data[f"POLE_{i}_posy"]
+                PosZ = poles.data[f"POLE_{i}_posz"]
+                
+            with bpy.data.libraries.load(str(file_path)) as (data_from, data_to):
+                for name in data_from.objects:
+                    if name == poles.data[f"POLE_{i}_name"]:
+                        data_to.objects = [name]
+            
+            level = bpy.data.collections['level']
+            
+            for obj in data_to.objects:
+                SetupPosition(obj, PosX, PosY, PosZ)
+                level.objects.link(obj)
+    
+    def ReadWaypoints():
+        if Waypoints.Instances == 0:
+            return
+        setattr(waypoints, 'data', OrderedDict())
+        for i in range(Waypoints.Instances):
+            i += 1
+            if (i == 1):
+                start = GetPositionAtLength(LevelFull, '<object type="WAYPOINT', None)
+                end = GetPositionAtLength(LevelFull, 't>', start)
+                #print(start, end)
+            else:
+                start = GetPositionAtLength(LevelFull, '<object type="WAYPOINT', waypoints.data['Where'] + 1)
+                end = GetPositionAtLength(LevelFull, 't>', start)
+            waypoints.data['Where'] = start
+            waypoints.data['WhereToEnd'] = end
+            TempPlayerSpawnpoint = ''
+            waypoints.data[f"WAYPOINT_{i}"] = ''
+            
+            # Fixed with a buffer of 2 on the end string
+            for index in range(start, end+2):
+                waypoints.data[f"WAYPOINT_{i}"] += LevelFull[index]
+                #print(LevelFull[index])
+            
+            for index in range(0, len(waypoints.data[f"WAYPOINT_{i}"])):
+                #print(playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"])
+                waypoints.data[f"WAYPOINT_{i}_name_start"] = GetPositionAtLength(waypoints.data[f"WAYPOINT_{i}"], 'type=', None)
+                namestart = waypoints.data[f"WAYPOINT_{i}_name_start"]
+                waypoints.data[f"WAYPOINT_{i}_name"] = GetValueAtLength(namestart+6, namestart+128, '"', None, 'y', waypoints.data[f"WAYPOINT_{i}"])
+                waypoints.data[f"WAYPOINT_{i}_name"] = GetValueAtLength(namestart+6, namestart+50, '"', None, 'y', waypoints.data[f"WAYPOINT_{i}"])
+                waypoints.data[f"WAYPOINT_{i}_posx_start"] = GetPositionAtLength(waypoints.data[f"WAYPOINT_{i}"], 'pos_x=', None)
+                waypoints.data[f"WAYPOINT_{i}_posy_start"] = GetPositionAtLength(waypoints.data[f"WAYPOINT_{i}"], 'pos_y=', None)
+                waypoints.data[f"WAYPOINT_{i}_posz_start"] = GetPositionAtLength(waypoints.data[f"WAYPOINT_{i}"], 'pos_z=', None)
+                waypoints.data[f"WAYPOINT_{i}_dynamic_start"] = GetPositionAtLength(waypoints.data[f"WAYPOINT_{i}"], 'dynamic', None)
+                waypoints.data[f"WAYPOINT_{i}_respawn_start"] = GetPositionAtLength(waypoints.data[f"WAYPOINT_{i}"], 'respawn', None)
+                PosXStart = waypoints.data[f"WAYPOINT_{i}_posx_start"]
+                PosYStart = waypoints.data[f"WAYPOINT_{i}_posy_start"]
+                PosZStart = waypoints.data[f"WAYPOINT_{i}_posz_start"]
+                Dynamic_Start = waypoints.data[f"WAYPOINT_{i}_dynamic_start"]
+                Respawn_Start = waypoints.data[f"WAYPOINT_{i}_respawn_start"]
+                
+                waypoints.data[f"WAYPOINT_{i}_posx"] = GetValueAtExpressionLength(PosXStart+7, PosXStart+64, r'-?\d+\.?\d*"', 'y', waypoints.data[f"WAYPOINT_{i}"])
+                waypoints.data[f"WAYPOINT_{i}_posy"] = GetValueAtExpressionLength(PosYStart+7, PosYStart+64, r'-?\d+\.?\d*"', 'y', waypoints.data[f"WAYPOINT_{i}"])
+                waypoints.data[f"WAYPOINT_{i}_posz"] = GetValueAtExpressionLength(PosZStart+7, PosZStart+64, r'-?\d+\.?\d*"', 'y', waypoints.data[f"WAYPOINT_{i}"])
+                waypoints.data[f"WAYPOINT_{i}_dynamic"] = GetValueAtExpressionLength(Dynamic_Start+16, Dynamic_Start+24, r'[t]"|[e]"', 'y', waypoints.data[f"WAYPOINT_{i}"])
+                waypoints.data[f"WAYPOINT_{i}_respawn"] = GetValueAtExpressionLength(Respawn_Start+16, Respawn_Start+22, r'[e]"', 'y', waypoints.data[f"WAYPOINT_{i}"])
+                PosX = waypoints.data[f"WAYPOINT_{i}_posx"]
+                PosY = waypoints.data[f"WAYPOINT_{i}_posy"]
+                PosZ = waypoints.data[f"WAYPOINT_{i}_posz"]
+                Dynamic = waypoints.data[f"WAYPOINT_{i}_dynamic"]
+                Respawn = (str.capitalize(waypoints.data[f"WAYPOINT_{i}_respawn"]) == "True") and True or False
+            with bpy.data.libraries.load(str(file_path)) as (data_from, data_to):
+                for name in data_from.objects:
+                    if name == waypoints.data[f"WAYPOINT_{i}_name"]:
+                        data_to.objects = [name]
+            
+            level = bpy.data.collections['level']
+            
+            for obj in data_to.objects:
+                SetupPosition(obj, PosX, PosY, PosZ)
+                setup_dynamic(obj, Dynamic)
+                setup_respawn(obj, Respawn)
+                level.objects.link(obj)
+    
+    def ReadCheckpoints():
+        if Checkpoints.Instances == 0:
+            return
+        setattr(checkpoints, 'data', OrderedDict())
+        for i in range(Checkpoints.Instances):
+            i += 1
+            if (i == 1):
+                start = GetPositionAtLength(LevelFull, '<object type="CHECKPOINT', None)
+                end = GetPositionAtLength(LevelFull, '/>', start)
+                #print(start, end) debugs the start and end of the very first bridge
+            else:
+                start = GetPositionAtLength(LevelFull, '<object type="CHECKPOINT', checkpoints.data['Where'] + 1)
+                end = GetPositionAtLength(LevelFull, '/>', start)
+            checkpoints.data['Where'] = start
+            checkpoints.data['WhereToEnd'] = end
+            TempCheckpoint = ''
+            checkpoints.data[f"CHECKPOINT_{i}"] = ''
+            
+            # Fixed with a buffer of 2 on the end string
+            for index in range(start, end+2):
+                checkpoints.data[f"CHECKPOINT_{i}"] += LevelFull[index]
+                #print(LevelFull[index])
+            
+            for index in range(0, len(checkpoints.data[f"CHECKPOINT_{i}"])):
+                checkpoints.data[f"CHECKPOINT_{i}_name_start"] = GetPositionAtLength(checkpoints.data[f"CHECKPOINT_{i}"], 'type=', None)
+                namestart = checkpoints.data[f"CHECKPOINT_{i}_name_start"]
+                checkpoints.data[f"CHECKPOINT_{i}_name"] = GetValueAtLength(namestart+6, namestart+128, '"', None, 'y', checkpoints.data[f"CHECKPOINT_{i}"])
+                checkpoints.data[f"CHECKPOINT_{i}_name"] = GetValueAtLength(namestart+6, namestart+50, '"', None, 'y', checkpoints.data[f"CHECKPOINT_{i}"])
+                PosXStart = GetPositionAtLength(checkpoints.data[f"CHECKPOINT_{i}"], 'pos_x=', None)
+                PosYStart = GetPositionAtLength(checkpoints.data[f"CHECKPOINT_{i}"], 'pos_y=', None)
+                PosZStart = GetPositionAtLength(checkpoints.data[f"CHECKPOINT_{i}"], 'pos_z=', None)
+                RigXStart = GetPositionAtLength(checkpoints.data[f"CHECKPOINT_{i}"], 'right_x=', None)
+                RigYStart = GetPositionAtLength(checkpoints.data[f"CHECKPOINT_{i}"], 'right_y=', None)
+                RigZStart = GetPositionAtLength(checkpoints.data[f"CHECKPOINT_{i}"], 'right_z=', None)
+                UpXStart = GetPositionAtLength(checkpoints.data[f"CHECKPOINT_{i}"], 'up_x=', None)
+                UpYStart = GetPositionAtLength(checkpoints.data[f"CHECKPOINT_{i}"], 'up_y=', None)
+                UpZStart = GetPositionAtLength(checkpoints.data[f"CHECKPOINT_{i}"], 'up_z=', None)
+                ForXStart = GetPositionAtLength(checkpoints.data[f"CHECKPOINT_{i}"], 'forward_x=', None)
+                ForYStart = GetPositionAtLength(checkpoints.data[f"CHECKPOINT_{i}"], 'forward_y=', None)
+                ForZStart = GetPositionAtLength(checkpoints.data[f"CHECKPOINT_{i}"], 'forward_z=', None)
+                
+                PosX = GetValueAtExpressionLength(PosXStart+7, PosXStart+64, r'-?\d+\.?\d*"', 'y', checkpoints.data[f"CHECKPOINT_{i}"])
+                PosY = GetValueAtExpressionLength(PosYStart+7, PosYStart+64, r'-?\d+\.?\d*"', 'y', checkpoints.data[f"CHECKPOINT_{i}"])
+                PosZ = GetValueAtExpressionLength(PosZStart+7, PosZStart+64, r'-?\d+\.?\d*"', 'y', checkpoints.data[f"CHECKPOINT_{i}"])
+                RigX = GetValueAtExpressionLength(RigXStart+9, RigXStart+64, r'-?\d+\.?\d*"', 'y', checkpoints.data[f"CHECKPOINT_{i}"])
+                RigY = GetValueAtExpressionLength(RigYStart+9, RigYStart+64, r'-?\d+\.?\d*"', 'y', checkpoints.data[f"CHECKPOINT_{i}"])
+                RigZ = GetValueAtExpressionLength(RigZStart+9, RigZStart+64, r'-?\d+\.?\d*"', 'y', checkpoints.data[f"CHECKPOINT_{i}"])
+                UpX = GetValueAtExpressionLength(UpXStart+6, UpXStart+64, r'-?\d+\.?\d*"', 'y', checkpoints.data[f"CHECKPOINT_{i}"])
+                UpY = GetValueAtExpressionLength(UpYStart+6, UpYStart+64, r'-?\d+\.?\d*"', 'y', checkpoints.data[f"CHECKPOINT_{i}"])
+                UpZ = GetValueAtExpressionLength(UpZStart+6, UpZStart+64, r'-?\d+\.?\d*"', 'y', checkpoints.data[f"CHECKPOINT_{i}"])
+                ForX = GetValueAtExpressionLength(ForXStart+11, ForXStart+64, r'-?\d+\.?\d*"', 'y', checkpoints.data[f"CHECKPOINT_{i}"])
+                ForY = GetValueAtExpressionLength(ForYStart+11, ForYStart+64, r'-?\d+\.?\d*"', 'y', checkpoints.data[f"CHECKPOINT_{i}"])
+                ForZ = GetValueAtExpressionLength(ForZStart+11, ForZStart+64, r'-?\d+\.?\d*"', 'y', checkpoints.data[f"CHECKPOINT_{i}"])
+                
+            with bpy.data.libraries.load(str(file_path)) as (data_from, data_to):
+                for name in data_from.objects:
+                    if name == checkpoints.data[f"CHECKPOINT_{i}_name"]:
+                        data_to.objects = [name]
+            
+            level = bpy.data.collections['level']
+            
+            for obj in data_to.objects:
+                SetupPosition(obj, PosX, PosY, PosZ)
+                #print(bridges.data[f"BRIDGE_{i}"])
+                #print(RigX, UpY, ForZ)
+                SetupRotation(obj, RigX, RigY, RigZ, UpX, UpY, UpZ, ForX, ForY, ForZ)
+                level.objects.link(obj)
+    
+    def ReadMorphs():
+        if Morphs.Instances == 0:
+            return
+        setattr(morphs, 'data', OrderedDict())
+        for i in range(Morphs.Instances):
+            i += 1
+            if (i == 1):
+                start = GetPositionAtLength(LevelFull, '<object type="MORPH', None)
+                end = GetPositionAtLength(LevelFull, 't>', start)
+                #print(start, end)
+            else:
+                start = GetPositionAtLength(LevelFull, '<object type="MORPH', morphs.data['Where'] + 1)
+                end = GetPositionAtLength(LevelFull, 't>', start)
+            morphs.data['Where'] = start
+            morphs.data['WhereToEnd'] = end
+            TempMorph = ''
+            morphs.data[f"MORPH_{i}"] = ''
+            
+            # Fixed with a buffer of 2 on the end string
+            for index in range(start, end+2):
+                morphs.data[f"MORPH_{i}"] += LevelFull[index]
+                #print(LevelFull[index])
+            
+            for index in range(0, len(morphs.data[f"MORPH_{i}"])):
+                #print(playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"])
+                morphs.data[f"MORPH_{i}_name_start"] = GetPositionAtLength(morphs.data[f"MORPH_{i}"], 'type=', None)
+                namestart = morphs.data[f"MORPH_{i}_name_start"]
+                morphs.data[f"MORPH_{i}_name"] = GetValueAtLength(namestart+6, namestart+128, '"', None, 'y', morphs.data[f"MORPH_{i}"])
+                morphs.data[f"MORPH_{i}_name"] = GetValueAtLength(namestart+6, namestart+50, '"', None, 'y', morphs.data[f"MORPH_{i}"])
+                morphs.data[f"MORPH_{i}_posx_start"] = GetPositionAtLength(morphs.data[f"MORPH_{i}"], 'pos_x=', None)
+                morphs.data[f"MORPH_{i}_posy_start"] = GetPositionAtLength(morphs.data[f"MORPH_{i}"], 'pos_y=', None)
+                morphs.data[f"MORPH_{i}_posz_start"] = GetPositionAtLength(morphs.data[f"MORPH_{i}"], 'pos_z=', None)
+                morphs.data[f"MORPH_{i}_morph_to_start"] = GetPositionAtLength(morphs.data[f"MORPH_{i}"], 'morph_to', None)
+                morphs.data[f"MORPH_{i}_dynamic_start"] = GetPositionAtLength(morphs.data[f"MORPH_{i}"], 'dynamic', None)
+                morphs.data[f"MORPH_{i}_respawn_start"] = GetPositionAtLength(morphs.data[f"MORPH_{i}"], 'respawn', None)
+                PosXStart = morphs.data[f"MORPH_{i}_posx_start"]
+                PosYStart = morphs.data[f"MORPH_{i}_posy_start"]
+                PosZStart = morphs.data[f"MORPH_{i}_posz_start"]
+                RigXStart = GetPositionAtLength(morphs.data[f"MORPH_{i}"], 'right_x=', None)
+                RigYStart = GetPositionAtLength(morphs.data[f"MORPH_{i}"], 'right_y=', None)
+                RigZStart = GetPositionAtLength(morphs.data[f"MORPH_{i}"], 'right_z=', None)
+                UpXStart = GetPositionAtLength(morphs.data[f"MORPH_{i}"], 'up_x=', None)
+                UpYStart = GetPositionAtLength(morphs.data[f"MORPH_{i}"], 'up_y=', None)
+                UpZStart = GetPositionAtLength(morphs.data[f"MORPH_{i}"], 'up_z=', None)
+                ForXStart = GetPositionAtLength(morphs.data[f"MORPH_{i}"], 'forward_x=', None)
+                ForYStart = GetPositionAtLength(morphs.data[f"MORPH_{i}"], 'forward_y=', None)
+                ForZStart = GetPositionAtLength(morphs.data[f"MORPH_{i}"], 'forward_z=', None)
+                Morph_To_Start = morphs.data[f"MORPH_{i}_morph_to_start"]
+                Dynamic_Start = morphs.data[f"MORPH_{i}_dynamic_start"]
+                Respawn_Start = morphs.data[f"MORPH_{i}_respawn_start"]
+            
+                
+                morphs.data[f"MORPH_{i}_posx"] = GetValueAtExpressionLength(PosXStart+7, PosXStart+64, r'-?\d+\.?\d*"', 'y', morphs.data[f"MORPH_{i}"])
+                morphs.data[f"MORPH_{i}_posy"] = GetValueAtExpressionLength(PosYStart+7, PosYStart+64, r'-?\d+\.?\d*"', 'y', morphs.data[f"MORPH_{i}"])
+                morphs.data[f"MORPH_{i}_posz"] = GetValueAtExpressionLength(PosZStart+7, PosZStart+64, r'-?\d+\.?\d*"', 'y', morphs.data[f"MORPH_{i}"])
+                morphs.data[f"MORPH_{i}_morph_to"] = GetValueAtExpressionLength(Morph_To_Start+17, Morph_To_Start+28, r'[l]"', 'y', morphs.data[f"MORPH_{i}"])
+                morphs.data[f"MORPH_{i}_respawn"] = GetValueAtExpressionLength(Respawn_Start+16, Respawn_Start+22, r'[e]"', 'y', morphs.data[f"MORPH_{i}"])
+                morphs.data[f"MORPH_{i}_dynamic"] = GetValueAtExpressionLength(Dynamic_Start+16, Dynamic_Start+24, r'[t]"|[e]"', 'y', morphs.data[f"MORPH_{i}"])
+                PosX = morphs.data[f"MORPH_{i}_posx"]
+                PosY = morphs.data[f"MORPH_{i}_posy"]
+                PosZ = morphs.data[f"MORPH_{i}_posz"]
+                RigX = GetValueAtExpressionLength(RigXStart+9, RigXStart+64, r'-?\d+\.?\d*"', 'y', morphs.data[f"MORPH_{i}"])
+                RigY = GetValueAtExpressionLength(RigYStart+9, RigYStart+64, r'-?\d+\.?\d*"', 'y', morphs.data[f"MORPH_{i}"])
+                RigZ = GetValueAtExpressionLength(RigZStart+9, RigZStart+64, r'-?\d+\.?\d*"', 'y', morphs.data[f"MORPH_{i}"])
+                UpX = GetValueAtExpressionLength(UpXStart+6, UpXStart+64, r'-?\d+\.?\d*"', 'y', morphs.data[f"MORPH_{i}"])
+                UpY = GetValueAtExpressionLength(UpYStart+6, UpYStart+64, r'-?\d+\.?\d*"', 'y', morphs.data[f"MORPH_{i}"])
+                UpZ = GetValueAtExpressionLength(UpZStart+6, UpZStart+64, r'-?\d+\.?\d*"', 'y', morphs.data[f"MORPH_{i}"])
+                ForX = GetValueAtExpressionLength(ForXStart+11, ForXStart+64, r'-?\d+\.?\d*"', 'y', morphs.data[f"MORPH_{i}"])
+                ForY = GetValueAtExpressionLength(ForYStart+11, ForYStart+64, r'-?\d+\.?\d*"', 'y', morphs.data[f"MORPH_{i}"])
+                ForZ = GetValueAtExpressionLength(ForZStart+11, ForZStart+64, r'-?\d+\.?\d*"', 'y', morphs.data[f"MORPH_{i}"])
+                MorphTo = morphs.data[f"MORPH_{i}_morph_to"]
+                Dynamic = morphs.data[f"MORPH_{i}_dynamic"]
+                Respawn = (str.capitalize(morphs.data[f"MORPH_{i}_respawn"]) == "True") and True or False
+            
+            with bpy.data.libraries.load(str(file_path)) as (data_from, data_to):
+                for name in data_from.objects:
+                    if name == morphs.data[f"MORPH_{i}_name"]:
+                        data_to.objects = [name]
+            
+            level = bpy.data.collections['level']
+                    
+            for obj in data_to.objects:
+                ball.MorphCall(MorphTo)
+                #MorphNumber = 0
+                #MorphNumber = SwitchMorphIndex(MorphTo, MorphNumber)
+                #print(MorphNumber)
+                SetupPosition(obj, PosX, PosY, PosZ)
+                SetupRotation(obj, RigX, RigY, RigZ, UpX, UpY, UpZ, ForX, ForY, ForZ)
+                setup_dynamic(obj, Dynamic)
+                setup_respawn(obj, Respawn)
+                disable_ball_option(obj['morph_to'])
+                obj['morph_to'][ball.Option] = True
+                ball.ResetOption()
+                level.objects.link(obj)
+    
+    def ReadPumps():
+        if Pumps.Instances == 0:
+            return
+        setattr(pumps, 'data', OrderedDict())
+        for i in range(Pumps.Instances):
+            i += 1
+            if (i == 1):
+                start = GetPositionAtLength(LevelFull, '<object type="PUMP', None)
+                end = GetPositionAtLength(LevelFull, 't>', start)
+                #print(start, end)
+            else:
+                start = GetPositionAtLength(LevelFull, '<object type="PUMP', pumps.data['Where'] + 1)
+                end = GetPositionAtLength(LevelFull, 't>', start)
+            pumps.data['Where'] = start
+            pumps.data['WhereToEnd'] = end
+            TempPump = ''
+            pumps.data[f"PUMP_{i}"] = ''
+            
+            # Fixed with a buffer of 2 on the end string
+            for index in range(start, end+2):
+                pumps.data[f"PUMP_{i}"] += LevelFull[index]
+                #print(LevelFull[index])
+            
+            for index in range(0, len(pumps.data[f"PUMP_{i}"])):
+                #print(playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"])
+                pumps.data[f"PUMP_{i}_name_start"] = GetPositionAtLength(pumps.data[f"PUMP_{i}"], 'type=', None)
+                namestart = pumps.data[f"PUMP_{i}_name_start"]
+                pumps.data[f"PUMP_{i}_name"] = GetValueAtLength(namestart+6, namestart+128, '"', None, 'y', pumps.data[f"PUMP_{i}"])
+                pumps.data[f"PUMP_{i}_name"] = GetValueAtLength(namestart+6, namestart+50, '"', None, 'y', pumps.data[f"PUMP_{i}"])
+                pumps.data[f"PUMP_{i}_posx_start"] = GetPositionAtLength(pumps.data[f"PUMP_{i}"], 'pos_x=', None)
+                pumps.data[f"PUMP_{i}_posy_start"] = GetPositionAtLength(pumps.data[f"PUMP_{i}"], 'pos_y=', None)
+                pumps.data[f"PUMP_{i}_posz_start"] = GetPositionAtLength(pumps.data[f"PUMP_{i}"], 'pos_z=', None)
+                pumps.data[f"PUMP_{i}_active_on_startup_start"] = GetPositionAtLength(pumps.data[f"PUMP_{i}"], 'active_on_startup', None)
+                pumps.data[f"PUMP_{i}_dynamic_start"] = GetPositionAtLength(pumps.data[f"PUMP_{i}"], 'dynamic', None)
+                pumps.data[f"PUMP_{i}_respawn_start"] = GetPositionAtLength(pumps.data[f"PUMP_{i}"], 'respawn', None)
+                PosXStart = pumps.data[f"PUMP_{i}_posx_start"]
+                PosYStart = pumps.data[f"PUMP_{i}_posy_start"]
+                PosZStart = pumps.data[f"PUMP_{i}_posz_start"]
+                RigXStart = GetPositionAtLength(pumps.data[f"PUMP_{i}"], 'right_x=', None)
+                RigYStart = GetPositionAtLength(pumps.data[f"PUMP_{i}"], 'right_y=', None)
+                RigZStart = GetPositionAtLength(pumps.data[f"PUMP_{i}"], 'right_z=', None)
+                UpXStart = GetPositionAtLength(pumps.data[f"PUMP_{i}"], 'up_x=', None)
+                UpYStart = GetPositionAtLength(pumps.data[f"PUMP_{i}"], 'up_y=', None)
+                UpZStart = GetPositionAtLength(pumps.data[f"PUMP_{i}"], 'up_z=', None)
+                ForXStart = GetPositionAtLength(pumps.data[f"PUMP_{i}"], 'forward_x=', None)
+                ForYStart = GetPositionAtLength(pumps.data[f"PUMP_{i}"], 'forward_y=', None)
+                ForZStart = GetPositionAtLength(pumps.data[f"PUMP_{i}"], 'forward_z=', None)
+                Active_On_Startup_Start = pumps.data[f"PUMP_{i}_active_on_startup_start"]
+                Dynamic_Start = pumps.data[f"PUMP_{i}_dynamic_start"]
+                Respawn_Start = pumps.data[f"PUMP_{i}_respawn_start"]
+            
+                
+                pumps.data[f"PUMP_{i}_posx"] = GetValueAtExpressionLength(PosXStart+7, PosXStart+64, r'-?\d+\.?\d*"', 'y', pumps.data[f"PUMP_{i}"])
+                pumps.data[f"PUMP_{i}_posy"] = GetValueAtExpressionLength(PosYStart+7, PosYStart+64, r'-?\d+\.?\d*"', 'y', pumps.data[f"PUMP_{i}"])
+                pumps.data[f"PUMP_{i}_posz"] = GetValueAtExpressionLength(PosZStart+7, PosZStart+64, r'-?\d+\.?\d*"', 'y', pumps.data[f"PUMP_{i}"])
+                pumps.data[f"PUMP_{i}_active_on_startup"] = GetValueAtExpressionLength(Active_On_Startup_Start+26, Active_On_Startup_Start+32, r'[e]"', 'y', pumps.data[f"PUMP_{i}"])
+                pumps.data[f"PUMP_{i}_respawn"] = GetValueAtExpressionLength(Respawn_Start+16, Respawn_Start+22, r'[e]"', 'y', pumps.data[f"PUMP_{i}"])
+                pumps.data[f"PUMP_{i}_dynamic"] = GetValueAtExpressionLength(Dynamic_Start+16, Dynamic_Start+24, r'[t]"|[e]"', 'y', pumps.data[f"PUMP_{i}"])
+                PosX = pumps.data[f"PUMP_{i}_posx"]
+                PosY = pumps.data[f"PUMP_{i}_posy"]
+                PosZ = pumps.data[f"PUMP_{i}_posz"]
+                RigX = GetValueAtExpressionLength(RigXStart+9, RigXStart+64, r'-?\d+\.?\d*"', 'y', pumps.data[f"PUMP_{i}"])
+                RigY = GetValueAtExpressionLength(RigYStart+9, RigYStart+64, r'-?\d+\.?\d*"', 'y', pumps.data[f"PUMP_{i}"])
+                RigZ = GetValueAtExpressionLength(RigZStart+9, RigZStart+64, r'-?\d+\.?\d*"', 'y', pumps.data[f"PUMP_{i}"])
+                UpX = GetValueAtExpressionLength(UpXStart+6, UpXStart+64, r'-?\d+\.?\d*"', 'y', pumps.data[f"PUMP_{i}"])
+                UpY = GetValueAtExpressionLength(UpYStart+6, UpYStart+64, r'-?\d+\.?\d*"', 'y', pumps.data[f"PUMP_{i}"])
+                UpZ = GetValueAtExpressionLength(UpZStart+6, UpZStart+64, r'-?\d+\.?\d*"', 'y', pumps.data[f"PUMP_{i}"])
+                ForX = GetValueAtExpressionLength(ForXStart+11, ForXStart+64, r'-?\d+\.?\d*"', 'y', pumps.data[f"PUMP_{i}"])
+                ForY = GetValueAtExpressionLength(ForYStart+11, ForYStart+64, r'-?\d+\.?\d*"', 'y', pumps.data[f"PUMP_{i}"])
+                ForZ = GetValueAtExpressionLength(ForZStart+11, ForZStart+64, r'-?\d+\.?\d*"', 'y', pumps.data[f"PUMP_{i}"])
+                ActiveOnStartup = (str.capitalize(pumps.data[f"PUMP_{i}_active_on_startup"]) == "True") and True or False
+                Dynamic = pumps.data[f"PUMP_{i}_dynamic"]
+                Respawn = (str.capitalize(pumps.data[f"PUMP_{i}_respawn"]) == "True") and True or False
+            
+            with bpy.data.libraries.load(str(file_path)) as (data_from, data_to):
+                for name in data_from.objects:
+                    if name == pumps.data[f"PUMP_{i}_name"]:
+                        data_to.objects = [name]
+            
+            level = bpy.data.collections['level']
+                    
+            for obj in data_to.objects:
+                #print(MorphNumber)
+                SetupPosition(obj, PosX, PosY, PosZ)
+                SetupRotation(obj, RigX, RigY, RigZ, UpX, UpY, UpZ, ForX, ForY, ForZ)
+                
+                if ActiveOnStartup:
+                    obj['active_on_startup'][0] = True
+                    obj['active_on_startup'][1] = False
+                else:
+                    obj['active_on_startup'][0] = False
+                    obj['active_on_startup'][1] = True
+                
+                setup_dynamic(obj, Dynamic)
+                setup_respawn(obj, Respawn)
+                level.objects.link(obj)
+    
+    def ReadGyrocopters():
+        if Gyrocopters.Instances == 0:
+            return
+        setattr(gyrocopters, 'data', OrderedDict())
+        if Gyrocopters.Instances == 0:
+            return
+        for i in range(Gyrocopters.Instances):
+            i += 1
+            if (i == 1):
+                start = GetPositionAtLength(LevelFull, '<object type="GYROCOPTER', None)
+                end = GetPositionAtLength(LevelFull, 't>', start)
+                #print(start, end)
+            else:
+                start = GetPositionAtLength(LevelFull, '<object type="GYROCOPTER', gyrocopters.data['Where'] + 1)
+                end = GetPositionAtLength(LevelFull, 't>', start)
+            gyrocopters.data['Where'] = start
+            gyrocopters.data['WhereToEnd'] = end
+            TempGyrocopter = ''
+            gyrocopters.data[f"GYROCOPTER_{i}"] = ''
+            
+            # Fixed with a buffer of 2 on the end string
+            for index in range(start, end+2):
+                gyrocopters.data[f"GYROCOPTER_{i}"] += LevelFull[index]
+                #print(LevelFull[index])
+            
+            for index in range(0, len(gyrocopters.data[f"GYROCOPTER_{i}"])):
+                #print(playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"])
+                gyrocopters.data[f"GYROCOPTER_{i}_name_start"] = GetPositionAtLength(gyrocopters.data[f"GYROCOPTER_{i}"], 'type=', None)
+                namestart = gyrocopters.data[f"GYROCOPTER_{i}_name_start"]
+                gyrocopters.data[f"GYROCOPTER_{i}_name"] = GetValueAtLength(namestart+6, namestart+128, '"', None, 'y', gyrocopters.data[f"GYROCOPTER_{i}"])
+                gyrocopters.data[f"GYROCOPTER_{i}_name"] = GetValueAtLength(namestart+6, namestart+50, '"', None, 'y', gyrocopters.data[f"GYROCOPTER_{i}"])
+                gyrocopters.data[f"GYROCOPTER_{i}_posx_start"] = GetPositionAtLength(gyrocopters.data[f"GYROCOPTER_{i}"], 'pos_x=', None)
+                gyrocopters.data[f"GYROCOPTER_{i}_posy_start"] = GetPositionAtLength(gyrocopters.data[f"GYROCOPTER_{i}"], 'pos_y=', None)
+                gyrocopters.data[f"GYROCOPTER_{i}_posz_start"] = GetPositionAtLength(gyrocopters.data[f"GYROCOPTER_{i}"], 'pos_z=', None)
+                gyrocopters.data[f"GYROCOPTER_{i}_first_waypoint_id_start"] = GetPositionAtLength(gyrocopters.data[f"GYROCOPTER_{i}"], 'first_waypoint_id', None)
+                gyrocopters.data[f"GYROCOPTER_{i}_dynamic_start"] = GetPositionAtLength(gyrocopters.data[f"GYROCOPTER_{i}"], 'dynamic', None)
+                gyrocopters.data[f"GYROCOPTER_{i}_respawn_start"] = GetPositionAtLength(gyrocopters.data[f"GYROCOPTER_{i}"], 'respawn', None)
+                PosXStart = gyrocopters.data[f"GYROCOPTER_{i}_posx_start"]
+                PosYStart = gyrocopters.data[f"GYROCOPTER_{i}_posy_start"]
+                PosZStart = gyrocopters.data[f"GYROCOPTER_{i}_posz_start"]
+                RigXStart = GetPositionAtLength(gyrocopters.data[f"GYROCOPTER_{i}"], 'right_x=', None)
+                RigYStart = GetPositionAtLength(gyrocopters.data[f"GYROCOPTER_{i}"], 'right_y=', None)
+                RigZStart = GetPositionAtLength(gyrocopters.data[f"GYROCOPTER_{i}"], 'right_z=', None)
+                UpXStart = GetPositionAtLength(gyrocopters.data[f"GYROCOPTER_{i}"], 'up_x=', None)
+                UpYStart = GetPositionAtLength(gyrocopters.data[f"GYROCOPTER_{i}"], 'up_y=', None)
+                UpZStart = GetPositionAtLength(gyrocopters.data[f"GYROCOPTER_{i}"], 'up_z=', None)
+                ForXStart = GetPositionAtLength(gyrocopters.data[f"GYROCOPTER_{i}"], 'forward_x=', None)
+                ForYStart = GetPositionAtLength(gyrocopters.data[f"GYROCOPTER_{i}"], 'forward_y=', None)
+                ForZStart = GetPositionAtLength(gyrocopters.data[f"GYROCOPTER_{i}"], 'forward_z=', None)
+                First_Waypoint_Id_Start = gyrocopters.data[f"GYROCOPTER_{i}_first_waypoint_id_start"]
+                Dynamic_Start = gyrocopters.data[f"GYROCOPTER_{i}_dynamic_start"]
+                Respawn_Start = gyrocopters.data[f"GYROCOPTER_{i}_respawn_start"]
+            
+                
+                gyrocopters.data[f"GYROCOPTER_{i}_posx"] = GetValueAtExpressionLength(PosXStart+7, PosXStart+64, r'-?\d+\.?\d*"', 'y', gyrocopters.data[f"GYROCOPTER_{i}"])
+                gyrocopters.data[f"GYROCOPTER_{i}_posy"] = GetValueAtExpressionLength(PosYStart+7, PosYStart+64, r'-?\d+\.?\d*"', 'y', gyrocopters.data[f"GYROCOPTER_{i}"])
+                gyrocopters.data[f"GYROCOPTER_{i}_posz"] = GetValueAtExpressionLength(PosZStart+7, PosZStart+64, r'-?\d+\.?\d*"', 'y', gyrocopters.data[f"GYROCOPTER_{i}"])
+                gyrocopters.data[f"GYROCOPTER_{i}_first_waypoint_id"] = GetValueAtExpressionLength(First_Waypoint_Id_Start+26, First_Waypoint_Id_Start+32, r'\d+"', 'y', gyrocopters.data[f"GYROCOPTER_{i}"])
+                gyrocopters.data[f"GYROCOPTER_{i}_respawn"] = GetValueAtExpressionLength(Respawn_Start+16, Respawn_Start+22, r'[e]"', 'y', gyrocopters.data[f"GYROCOPTER_{i}"])
+                gyrocopters.data[f"GYROCOPTER_{i}_dynamic"] = GetValueAtExpressionLength(Dynamic_Start+16, Dynamic_Start+24, r'[t]"|[e]"', 'y', gyrocopters.data[f"GYROCOPTER_{i}"])
+                PosX = gyrocopters.data[f"GYROCOPTER_{i}_posx"]
+                PosY = gyrocopters.data[f"GYROCOPTER_{i}_posy"]
+                PosZ = gyrocopters.data[f"GYROCOPTER_{i}_posz"]
+                RigX = GetValueAtExpressionLength(RigXStart+9, RigXStart+64, r'-?\d+\.?\d*"', 'y', gyrocopters.data[f"GYROCOPTER_{i}"])
+                RigY = GetValueAtExpressionLength(RigYStart+9, RigYStart+64, r'-?\d+\.?\d*"', 'y', gyrocopters.data[f"GYROCOPTER_{i}"])
+                RigZ = GetValueAtExpressionLength(RigZStart+9, RigZStart+64, r'-?\d+\.?\d*"', 'y', gyrocopters.data[f"GYROCOPTER_{i}"])
+                UpX = GetValueAtExpressionLength(UpXStart+6, UpXStart+64, r'-?\d+\.?\d*"', 'y', gyrocopters.data[f"GYROCOPTER_{i}"])
+                UpY = GetValueAtExpressionLength(UpYStart+6, UpYStart+64, r'-?\d+\.?\d*"', 'y', gyrocopters.data[f"GYROCOPTER_{i}"])
+                UpZ = GetValueAtExpressionLength(UpZStart+6, UpZStart+64, r'-?\d+\.?\d*"', 'y', gyrocopters.data[f"GYROCOPTER_{i}"])
+                ForX = GetValueAtExpressionLength(ForXStart+11, ForXStart+64, r'-?\d+\.?\d*"', 'y', gyrocopters.data[f"GYROCOPTER_{i}"])
+                ForY = GetValueAtExpressionLength(ForYStart+11, ForYStart+64, r'-?\d+\.?\d*"', 'y', gyrocopters.data[f"GYROCOPTER_{i}"])
+                ForZ = GetValueAtExpressionLength(ForZStart+11, ForZStart+64, r'-?\d+\.?\d*"', 'y', gyrocopters.data[f"GYROCOPTER_{i}"])
+                FirstWaypointId = gyrocopters.data[f"GYROCOPTER_{i}_first_waypoint_id"]
+                Dynamic = gyrocopters.data[f"GYROCOPTER_{i}_dynamic"]
+            
+            with bpy.data.libraries.load(str(file_path)) as (data_from, data_to):
+                for name in data_from.objects:
+                    if name == gyrocopters.data[f"GYROCOPTER_{i}_name"]:
+                        data_to.objects = [name]
+            
+            level = bpy.data.collections['level']
+                    
+            for obj in data_to.objects:
+                #print(MorphNumber)
+                SetupPosition(obj, PosX, PosY, PosZ)
+                SetupRotation(obj, RigX, RigY, RigZ, UpX, UpY, UpZ, ForX, ForY, ForZ)
+                setup_dynamic(obj, Dynamic)
+                obj["first_waypoint_id"] = int(FirstWaypointId)
+                #setup_respawn(obj, Respawn)
+                level.objects.link(obj)
+            
+    def ReadGenerators():
+        if Generators.Instances == 0:
+            return
+        setattr(generators, 'data', OrderedDict())
+        for i in range(Generators.Instances):
+            i += 1
+            if (i == 1):
+                start = GetPositionAtLength(LevelFull, '<object type="GENERATOR', None)
+                end = GetPositionAtLength(LevelFull, 't>', start)
+                #print(start, end)
+            else:
+                start = GetPositionAtLength(LevelFull, '<object type="GENERATOR', generators.data['Where'] + 1)
+                end = GetPositionAtLength(LevelFull, 't>', start)
+            generators.data['Where'] = start
+            generators.data['WhereToEnd'] = end
+            TempGenerator = ''
+            generators.data[f"GENERATOR_{i}"] = ''
+            
+            # Fixed with a buffer of 2 on the end string
+            for index in range(start, end+2):
+                generators.data[f"GENERATOR_{i}"] += LevelFull[index]
+                #print(LevelFull[index])
+            
+            for index in range(0, len(generators.data[f"GENERATOR_{i}"])):
+                #print(playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"])
+                generators.data[f"GENERATOR_{i}_name_start"] = GetPositionAtLength(generators.data[f"GENERATOR_{i}"], 'type=', None)
+                namestart = generators.data[f"GENERATOR_{i}_name_start"]
+                generators.data[f"GENERATOR_{i}_name"] = GetValueAtLength(namestart+6, namestart+128, '"', None, 'y', generators.data[f"GENERATOR_{i}"])
+                generators.data[f"GENERATOR_{i}_name"] = GetValueAtLength(namestart+6, namestart+50, '"', None, 'y', generators.data[f"GENERATOR_{i}"])
+                generators.data[f"GENERATOR_{i}_posx_start"] = GetPositionAtLength(generators.data[f"GENERATOR_{i}"], 'pos_x=', None)
+                generators.data[f"GENERATOR_{i}_posy_start"] = GetPositionAtLength(generators.data[f"GENERATOR_{i}"], 'pos_y=', None)
+                generators.data[f"GENERATOR_{i}_posz_start"] = GetPositionAtLength(generators.data[f"GENERATOR_{i}"], 'pos_z=', None)
+                generators.data[f"GENERATOR_{i}_dynamic_start"] = GetPositionAtLength(generators.data[f"GENERATOR_{i}"], 'dynamic', None)
+                generators.data[f"GENERATOR_{i}_respawn_start"] = GetPositionAtLength(generators.data[f"GENERATOR_{i}"], 'respawn', None)
+                generators.data[f"GENERATOR_{i}_generate_to_start"] = GetPositionAtLength(generators.data[f"GENERATOR_{i}"], 'generate_to', None)
+                PosXStart = generators.data[f"GENERATOR_{i}_posx_start"]
+                PosYStart = generators.data[f"GENERATOR_{i}_posy_start"]
+                PosZStart = generators.data[f"GENERATOR_{i}_posz_start"]
+                RigXStart = GetPositionAtLength(generators.data[f"GENERATOR_{i}"], 'right_x=', None)
+                RigYStart = GetPositionAtLength(generators.data[f"GENERATOR_{i}"], 'right_y=', None)
+                RigZStart = GetPositionAtLength(generators.data[f"GENERATOR_{i}"], 'right_z=', None)
+                UpXStart = GetPositionAtLength(generators.data[f"GENERATOR_{i}"], 'up_x=', None)
+                UpYStart = GetPositionAtLength(generators.data[f"GENERATOR_{i}"], 'up_y=', None)
+                UpZStart = GetPositionAtLength(generators.data[f"GENERATOR_{i}"], 'up_z=', None)
+                ForXStart = GetPositionAtLength(generators.data[f"GENERATOR_{i}"], 'forward_x=', None)
+                ForYStart = GetPositionAtLength(generators.data[f"GENERATOR_{i}"], 'forward_y=', None)
+                ForZStart = GetPositionAtLength(generators.data[f"GENERATOR_{i}"], 'forward_z=', None)
+                Dynamic_Start = generators.data[f"GENERATOR_{i}_dynamic_start"]
+                Respawn_Start = generators.data[f"GENERATOR_{i}_respawn_start"]
+                Generate_To_Start = generators.data[f"GENERATOR_{i}_generate_to_start"]
+                
+                generators.data[f"GENERATOR_{i}_posx"] = GetValueAtExpressionLength(PosXStart+7, PosXStart+64, r'-?\d+\.?\d*"', 'y', generators.data[f"GENERATOR_{i}"])
+                generators.data[f"GENERATOR_{i}_posy"] = GetValueAtExpressionLength(PosYStart+7, PosYStart+64, r'-?\d+\.?\d*"', 'y', generators.data[f"GENERATOR_{i}"])
+                generators.data[f"GENERATOR_{i}_posz"] = GetValueAtExpressionLength(PosZStart+7, PosZStart+64, r'-?\d+\.?\d*"', 'y', generators.data[f"GENERATOR_{i}"])
+                generators.data[f"GENERATOR_{i}_dynamic"] = GetValueAtExpressionLength(Dynamic_Start+16, Dynamic_Start+24, r'[t]"|[e]"', 'y', generators.data[f"GENERATOR_{i}"])
+                generators.data[f"GENERATOR_{i}_respawn"] = GetValueAtExpressionLength(Respawn_Start+16, Respawn_Start+22, r'[e]"', 'y', generators.data[f"GENERATOR_{i}"])
+                generators.data[f"GENERATOR_{i}_generate_to"] = GetValueAtExpressionLength(Generate_To_Start+20, Generate_To_Start+29, r'[t]"|[p]"|[c]"', 'y', generators.data[f"GENERATOR_{i}"])
+                PosX = generators.data[f"GENERATOR_{i}_posx"]
+                PosY = generators.data[f"GENERATOR_{i}_posy"]
+                PosZ = generators.data[f"GENERATOR_{i}_posz"]
+                RigX = GetValueAtExpressionLength(RigXStart+9, RigXStart+64, r'-?\d+\.?\d*"', 'y', generators.data[f"GENERATOR_{i}"])
+                RigY = GetValueAtExpressionLength(RigYStart+9, RigYStart+64, r'-?\d+\.?\d*"', 'y', generators.data[f"GENERATOR_{i}"])
+                RigZ = GetValueAtExpressionLength(RigZStart+9, RigZStart+64, r'-?\d+\.?\d*"', 'y', generators.data[f"GENERATOR_{i}"])
+                UpX = GetValueAtExpressionLength(UpXStart+6, UpXStart+64, r'-?\d+\.?\d*"', 'y', generators.data[f"GENERATOR_{i}"])
+                UpY = GetValueAtExpressionLength(UpYStart+6, UpYStart+64, r'-?\d+\.?\d*"', 'y', generators.data[f"GENERATOR_{i}"])
+                UpZ = GetValueAtExpressionLength(UpZStart+6, UpZStart+64, r'-?\d+\.?\d*"', 'y', generators.data[f"GENERATOR_{i}"])
+                ForX = GetValueAtExpressionLength(ForXStart+11, ForXStart+64, r'-?\d+\.?\d*"', 'y', generators.data[f"GENERATOR_{i}"])
+                ForY = GetValueAtExpressionLength(ForYStart+11, ForYStart+64, r'-?\d+\.?\d*"', 'y', generators.data[f"GENERATOR_{i}"])
+                ForZ = GetValueAtExpressionLength(ForZStart+11, ForZStart+64, r'-?\d+\.?\d*"', 'y', generators.data[f"GENERATOR_{i}"])
+                Dynamic = generators.data[f"GENERATOR_{i}_dynamic"]
+                Respawn = (str.capitalize(generators.data[f"GENERATOR_{i}_respawn"]) == "True") and True or False
+                GenerateTo = generators.data[f"GENERATOR_{i}_generate_to"]
+            with bpy.data.libraries.load(str(file_path)) as (data_from, data_to):
+                for name in data_from.objects:
+                    if name == generators.data[f"GENERATOR_{i}_name"]:
+                        data_to.objects = [name]
+            
+            level = bpy.data.collections['level']
+            
+            for obj in data_to.objects:
+                SetupPosition(obj, PosX, PosY, PosZ)
+                SetupRotation(obj, RigX, RigY, RigZ, UpX, UpY, UpZ, ForX, ForY, ForZ)
+                setup_dynamic(obj, Dynamic)
+                setup_respawn(obj, Respawn)
+                
+                if GenerateTo == "boost":
+                    obj['generate_to'][0] = True
+                elif GenerateTo == "jump":
+                    obj['generate_to'][1] = True
+                elif GenerateTo == "magnetic":
+                    obj['generate_to'][2] = True
+                
+                level.objects.link(obj)
+    
+    def ReadWoodcrates():
+        if Woodcrates.Instances == 0:
+            return
+        setattr(woodcrates, 'data', OrderedDict())
+        for i in range(Woodcrates.Instances):
+            i += 1
+            if (i == 1):
+                start = GetPositionAtLength(LevelFull, '<object type="WOODCRATE', None)
+                end = GetPositionAtLength(LevelFull, 't>', start)
+                #print(start, end)
+            else:
+                start = GetPositionAtLength(LevelFull, '<object type="WOODCRATE', woodcrates.data['Where'] + 1)
+                end = GetPositionAtLength(LevelFull, 't>', start)
+            woodcrates.data['Where'] = start
+            woodcrates.data['WhereToEnd'] = end
+            TempWoodcrate = ''
+            woodcrates.data[f"WOODCRATE_{i}"] = ''
+            
+            # Fixed with a buffer of 2 on the end string
+            for index in range(start, end+2):
+                woodcrates.data[f"WOODCRATE_{i}"] += LevelFull[index]
+                #print(LevelFull[index])
+            
+            for index in range(0, len(woodcrates.data[f"WOODCRATE_{i}"])):
+                #print(playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"])
+                woodcrates.data[f"WOODCRATE_{i}_name_start"] = GetPositionAtLength(woodcrates.data[f"WOODCRATE_{i}"], 'type=', None)
+                namestart = woodcrates.data[f"WOODCRATE_{i}_name_start"]
+                woodcrates.data[f"WOODCRATE_{i}_name"] = GetValueAtLength(namestart+6, namestart+128, '"', None, 'y', woodcrates.data[f"WOODCRATE_{i}"])
+                woodcrates.data[f"WOODCRATE_{i}_name"] = GetValueAtLength(namestart+6, namestart+50, '"', None, 'y', woodcrates.data[f"WOODCRATE_{i}"])
+                woodcrates.data[f"WOODCRATE_{i}_posx_start"] = GetPositionAtLength(woodcrates.data[f"WOODCRATE_{i}"], 'pos_x=', None)
+                woodcrates.data[f"WOODCRATE_{i}_posy_start"] = GetPositionAtLength(woodcrates.data[f"WOODCRATE_{i}"], 'pos_y=', None)
+                woodcrates.data[f"WOODCRATE_{i}_posz_start"] = GetPositionAtLength(woodcrates.data[f"WOODCRATE_{i}"], 'pos_z=', None)
+                woodcrates.data[f"WOODCRATE_{i}_dynamic_start"] = GetPositionAtLength(woodcrates.data[f"WOODCRATE_{i}"], 'dynamic', None)
+                woodcrates.data[f"WOODCRATE_{i}_respawn_start"] = GetPositionAtLength(woodcrates.data[f"WOODCRATE_{i}"], 'respawn', None)
+                PosXStart = woodcrates.data[f"WOODCRATE_{i}_posx_start"]
+                PosYStart = woodcrates.data[f"WOODCRATE_{i}_posy_start"]
+                PosZStart = woodcrates.data[f"WOODCRATE_{i}_posz_start"]
+                RigXStart = GetPositionAtLength(woodcrates.data[f"WOODCRATE_{i}"], 'right_x=', None)
+                RigYStart = GetPositionAtLength(woodcrates.data[f"WOODCRATE_{i}"], 'right_y=', None)
+                RigZStart = GetPositionAtLength(woodcrates.data[f"WOODCRATE_{i}"], 'right_z=', None)
+                UpXStart = GetPositionAtLength(woodcrates.data[f"WOODCRATE_{i}"], 'up_x=', None)
+                UpYStart = GetPositionAtLength(woodcrates.data[f"WOODCRATE_{i}"], 'up_y=', None)
+                UpZStart = GetPositionAtLength(woodcrates.data[f"WOODCRATE_{i}"], 'up_z=', None)
+                ForXStart = GetPositionAtLength(woodcrates.data[f"WOODCRATE_{i}"], 'forward_x=', None)
+                ForYStart = GetPositionAtLength(woodcrates.data[f"WOODCRATE_{i}"], 'forward_y=', None)
+                ForZStart = GetPositionAtLength(woodcrates.data[f"WOODCRATE_{i}"], 'forward_z=', None)
+                Dynamic_Start = woodcrates.data[f"WOODCRATE_{i}_dynamic_start"]
+                Respawn_Start = woodcrates.data[f"WOODCRATE_{i}_respawn_start"]
+                
+                woodcrates.data[f"WOODCRATE_{i}_posx"] = GetValueAtExpressionLength(PosXStart+7, PosXStart+64, r'-?\d+\.?\d*"', 'y', woodcrates.data[f"WOODCRATE_{i}"])
+                woodcrates.data[f"WOODCRATE_{i}_posy"] = GetValueAtExpressionLength(PosYStart+7, PosYStart+64, r'-?\d+\.?\d*"', 'y', woodcrates.data[f"WOODCRATE_{i}"])
+                woodcrates.data[f"WOODCRATE_{i}_posz"] = GetValueAtExpressionLength(PosZStart+7, PosZStart+64, r'-?\d+\.?\d*"', 'y', woodcrates.data[f"WOODCRATE_{i}"])
+                woodcrates.data[f"WOODCRATE_{i}_dynamic"] = GetValueAtExpressionLength(Dynamic_Start+16, Dynamic_Start+24, r'[t]"|[e]"', 'y', woodcrates.data[f"WOODCRATE_{i}"])
+                woodcrates.data[f"WOODCRATE_{i}_respawn"] = GetValueAtExpressionLength(Respawn_Start+16, Respawn_Start+22, r'[e]"', 'y', woodcrates.data[f"WOODCRATE_{i}"])
+                PosX = woodcrates.data[f"WOODCRATE_{i}_posx"]
+                PosY = woodcrates.data[f"WOODCRATE_{i}_posy"]
+                PosZ = woodcrates.data[f"WOODCRATE_{i}_posz"]
+                RigX = GetValueAtExpressionLength(RigXStart+9, RigXStart+64, r'-?\d+\.?\d*"', 'y', woodcrates.data[f"WOODCRATE_{i}"])
+                RigY = GetValueAtExpressionLength(RigYStart+9, RigYStart+64, r'-?\d+\.?\d*"', 'y', woodcrates.data[f"WOODCRATE_{i}"])
+                RigZ = GetValueAtExpressionLength(RigZStart+9, RigZStart+64, r'-?\d+\.?\d*"', 'y', woodcrates.data[f"WOODCRATE_{i}"])
+                UpX = GetValueAtExpressionLength(UpXStart+6, UpXStart+64, r'-?\d+\.?\d*"', 'y', woodcrates.data[f"WOODCRATE_{i}"])
+                UpY = GetValueAtExpressionLength(UpYStart+6, UpYStart+64, r'-?\d+\.?\d*"', 'y', woodcrates.data[f"WOODCRATE_{i}"])
+                UpZ = GetValueAtExpressionLength(UpZStart+6, UpZStart+64, r'-?\d+\.?\d*"', 'y', woodcrates.data[f"WOODCRATE_{i}"])
+                ForX = GetValueAtExpressionLength(ForXStart+11, ForXStart+64, r'-?\d+\.?\d*"', 'y', woodcrates.data[f"WOODCRATE_{i}"])
+                ForY = GetValueAtExpressionLength(ForYStart+11, ForYStart+64, r'-?\d+\.?\d*"', 'y', woodcrates.data[f"WOODCRATE_{i}"])
+                ForZ = GetValueAtExpressionLength(ForZStart+11, ForZStart+64, r'-?\d+\.?\d*"', 'y', woodcrates.data[f"WOODCRATE_{i}"])
+                Dynamic = woodcrates.data[f"WOODCRATE_{i}_dynamic"]
+                Respawn = (str.capitalize(woodcrates.data[f"WOODCRATE_{i}_respawn"]) == "True") and True or False
+            with bpy.data.libraries.load(str(file_path)) as (data_from, data_to):
+                for name in data_from.objects:
+                    if name == woodcrates.data[f"WOODCRATE_{i}_name"]:
+                        data_to.objects = [name]
+            
+            level = bpy.data.collections['level']
+            
+            for obj in data_to.objects:
+                SetupPosition(obj, PosX, PosY, PosZ)
+                SetupRotation(obj, RigX, RigY, RigZ, UpX, UpY, UpZ, ForX, ForY, ForZ)
+                setup_dynamic(obj, Dynamic)
+                setup_respawn(obj, Respawn)
+                level.objects.link(obj)
+    
+    def ReadMetalcrates():
+        if Metalcrates.Instances == 0:
+            return
+        setattr(metalcrates, 'data', OrderedDict())
+        for i in range(Metalcrates.Instances):
+            i += 1
+            if (i == 1):
+                start = GetPositionAtLength(LevelFull, '<object type="METALCRATE', None)
+                end = GetPositionAtLength(LevelFull, 't>', start)
+                #print(start, end)
+            else:
+                start = GetPositionAtLength(LevelFull, '<object type="METALCRATE', metalcrates.data['Where'] + 1)
+                end = GetPositionAtLength(LevelFull, 't>', start)
+            metalcrates.data['Where'] = start
+            metalcrates.data['WhereToEnd'] = end
+            TempMetalcrate = ''
+            metalcrates.data[f"METALCRATE_{i}"] = ''
+            
+            # Fixed with a buffer of 2 on the end string
+            for index in range(start, end+2):
+                metalcrates.data[f"METALCRATE_{i}"] += LevelFull[index]
+                #print(LevelFull[index])
+            
+            for index in range(0, len(metalcrates.data[f"METALCRATE_{i}"])):
+                #print(playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"])
+                metalcrates.data[f"METALCRATE_{i}_name_start"] = GetPositionAtLength(metalcrates.data[f"METALCRATE_{i}"], 'type=', None)
+                namestart = metalcrates.data[f"METALCRATE_{i}_name_start"]
+                metalcrates.data[f"METALCRATE_{i}_name"] = GetValueAtLength(namestart+6, namestart+128, '"', None, 'y', metalcrates.data[f"METALCRATE_{i}"])
+                metalcrates.data[f"METALCRATE_{i}_name"] = GetValueAtLength(namestart+6, namestart+50, '"', None, 'y', metalcrates.data[f"METALCRATE_{i}"])
+                metalcrates.data[f"METALCRATE_{i}_posx_start"] = GetPositionAtLength(metalcrates.data[f"METALCRATE_{i}"], 'pos_x=', None)
+                metalcrates.data[f"METALCRATE_{i}_posy_start"] = GetPositionAtLength(metalcrates.data[f"METALCRATE_{i}"], 'pos_y=', None)
+                metalcrates.data[f"METALCRATE_{i}_posz_start"] = GetPositionAtLength(metalcrates.data[f"METALCRATE_{i}"], 'pos_z=', None)
+                metalcrates.data[f"METALCRATE_{i}_dynamic_start"] = GetPositionAtLength(metalcrates.data[f"METALCRATE_{i}"], 'dynamic', None)
+                metalcrates.data[f"METALCRATE_{i}_respawn_start"] = GetPositionAtLength(metalcrates.data[f"METALCRATE_{i}"], 'respawn', None)
+                PosXStart = metalcrates.data[f"METALCRATE_{i}_posx_start"]
+                PosYStart = metalcrates.data[f"METALCRATE_{i}_posy_start"]
+                PosZStart = metalcrates.data[f"METALCRATE_{i}_posz_start"]
+                RigXStart = GetPositionAtLength(metalcrates.data[f"METALCRATE_{i}"], 'right_x=', None)
+                RigYStart = GetPositionAtLength(metalcrates.data[f"METALCRATE_{i}"], 'right_y=', None)
+                RigZStart = GetPositionAtLength(metalcrates.data[f"METALCRATE_{i}"], 'right_z=', None)
+                UpXStart = GetPositionAtLength(metalcrates.data[f"METALCRATE_{i}"], 'up_x=', None)
+                UpYStart = GetPositionAtLength(metalcrates.data[f"METALCRATE_{i}"], 'up_y=', None)
+                UpZStart = GetPositionAtLength(metalcrates.data[f"METALCRATE_{i}"], 'up_z=', None)
+                ForXStart = GetPositionAtLength(metalcrates.data[f"METALCRATE_{i}"], 'forward_x=', None)
+                ForYStart = GetPositionAtLength(metalcrates.data[f"METALCRATE_{i}"], 'forward_y=', None)
+                ForZStart = GetPositionAtLength(metalcrates.data[f"METALCRATE_{i}"], 'forward_z=', None)
+                Dynamic_Start = metalcrates.data[f"METALCRATE_{i}_dynamic_start"]
+                Respawn_Start = metalcrates.data[f"METALCRATE_{i}_respawn_start"]
+                
+                metalcrates.data[f"METALCRATE_{i}_posx"] = GetValueAtExpressionLength(PosXStart+7, PosXStart+64, r'-?\d+\.?\d*"', 'y', metalcrates.data[f"METALCRATE_{i}"])
+                metalcrates.data[f"METALCRATE_{i}_posy"] = GetValueAtExpressionLength(PosYStart+7, PosYStart+64, r'-?\d+\.?\d*"', 'y', metalcrates.data[f"METALCRATE_{i}"])
+                metalcrates.data[f"METALCRATE_{i}_posz"] = GetValueAtExpressionLength(PosZStart+7, PosZStart+64, r'-?\d+\.?\d*"', 'y', metalcrates.data[f"METALCRATE_{i}"])
+                metalcrates.data[f"METALCRATE_{i}_dynamic"] = GetValueAtExpressionLength(Dynamic_Start+16, Dynamic_Start+24, r'[t]"|[e]"', 'y', metalcrates.data[f"METALCRATE_{i}"])
+                metalcrates.data[f"METALCRATE_{i}_respawn"] = GetValueAtExpressionLength(Respawn_Start+16, Respawn_Start+22, r'[e]"', 'y', metalcrates.data[f"METALCRATE_{i}"])
+                PosX = metalcrates.data[f"METALCRATE_{i}_posx"]
+                PosY = metalcrates.data[f"METALCRATE_{i}_posy"]
+                PosZ = metalcrates.data[f"METALCRATE_{i}_posz"]
+                RigX = GetValueAtExpressionLength(RigXStart+9, RigXStart+64, r'-?\d+\.?\d*"', 'y', metalcrates.data[f"METALCRATE_{i}"])
+                RigY = GetValueAtExpressionLength(RigYStart+9, RigYStart+64, r'-?\d+\.?\d*"', 'y', metalcrates.data[f"METALCRATE_{i}"])
+                RigZ = GetValueAtExpressionLength(RigZStart+9, RigZStart+64, r'-?\d+\.?\d*"', 'y', metalcrates.data[f"METALCRATE_{i}"])
+                UpX = GetValueAtExpressionLength(UpXStart+6, UpXStart+64, r'-?\d+\.?\d*"', 'y', metalcrates.data[f"METALCRATE_{i}"])
+                UpY = GetValueAtExpressionLength(UpYStart+6, UpYStart+64, r'-?\d+\.?\d*"', 'y', metalcrates.data[f"METALCRATE_{i}"])
+                UpZ = GetValueAtExpressionLength(UpZStart+6, UpZStart+64, r'-?\d+\.?\d*"', 'y', metalcrates.data[f"METALCRATE_{i}"])
+                ForX = GetValueAtExpressionLength(ForXStart+11, ForXStart+64, r'-?\d+\.?\d*"', 'y', metalcrates.data[f"METALCRATE_{i}"])
+                ForY = GetValueAtExpressionLength(ForYStart+11, ForYStart+64, r'-?\d+\.?\d*"', 'y', metalcrates.data[f"METALCRATE_{i}"])
+                ForZ = GetValueAtExpressionLength(ForZStart+11, ForZStart+64, r'-?\d+\.?\d*"', 'y', metalcrates.data[f"METALCRATE_{i}"])
+                Dynamic = metalcrates.data[f"METALCRATE_{i}_dynamic"]
+                Respawn = (str.capitalize(metalcrates.data[f"METALCRATE_{i}_respawn"]) == "True") and True or False
+            with bpy.data.libraries.load(str(file_path)) as (data_from, data_to):
+                for name in data_from.objects:
+                    if name == metalcrates.data[f"METALCRATE_{i}_name"]:
+                        data_to.objects = [name]
+            
+            level = bpy.data.collections['level']
+            
+            for obj in data_to.objects:
+                SetupPosition(obj, PosX, PosY, PosZ)
+                SetupRotation(obj, RigX, RigY, RigZ, UpX, UpY, UpZ, ForX, ForY, ForZ)
+                setup_dynamic(obj, Dynamic)
+                setup_respawn(obj, Respawn)
+                level.objects.link(obj)
+                
+    def ReadPlatforms():
+        if Platforms.Instances == 0:
+            return
+        setattr(platforms, 'data', OrderedDict())
+        for i in range(Platforms.Instances):
+            i += 1
+            if (i == 1):
+                start = GetPositionAtLength(LevelFull, '<object type="PLATFORM', None)
+                end = GetPositionAtLength(LevelFull, '/>', start)
+                #print(start, end)
+            else:
+                start = GetPositionAtLength(LevelFull, '<object type="PLATFORM', platforms.data['Where'] + 1)
+                end = GetPositionAtLength(LevelFull, '/>', start)
+            platforms.data['Where'] = start
+            platforms.data['WhereToEnd'] = end
+            TempPlatform = ''
+            platforms.data[f"PLATFORM_{i}"] = ''
+            
+            # Fixed with a buffer of 2 on the end string
+            for index in range(start, end+2):
+                platforms.data[f"PLATFORM_{i}"] += LevelFull[index]
+                #print(LevelFull[index])
+            
+            for index in range(0, len(platforms.data[f"PLATFORM_{i}"])):
+                #print(playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"])
+                platforms.data[f"PLATFORM_{i}_name_start"] = GetPositionAtLength(platforms.data[f"PLATFORM_{i}"], 'type=', None)
+                namestart = platforms.data[f"PLATFORM_{i}_name_start"]
+                platforms.data[f"PLATFORM_{i}_name"] = GetValueAtLength(namestart+6, namestart+128, '"', None, 'y', platforms.data[f"PLATFORM_{i}"])
+                platforms.data[f"PLATFORM_{i}_name"] = GetValueAtLength(namestart+6, namestart+50, '"', None, 'y', platforms.data[f"PLATFORM_{i}"])
+                platforms.data[f"PLATFORM_{i}_posx_start"] = GetPositionAtLength(platforms.data[f"PLATFORM_{i}"], 'pos_x=', None)
+                platforms.data[f"PLATFORM_{i}_posy_start"] = GetPositionAtLength(platforms.data[f"PLATFORM_{i}"], 'pos_y=', None)
+                platforms.data[f"PLATFORM_{i}_posz_start"] = GetPositionAtLength(platforms.data[f"PLATFORM_{i}"], 'pos_z=', None)
+                PosXStart = platforms.data[f"PLATFORM_{i}_posx_start"]
+                PosYStart = platforms.data[f"PLATFORM_{i}_posy_start"]
+                PosZStart = platforms.data[f"PLATFORM_{i}_posz_start"]
+                RigXStart = GetPositionAtLength(platforms.data[f"PLATFORM_{i}"], 'right_x=', None)
+                RigYStart = GetPositionAtLength(platforms.data[f"PLATFORM_{i}"], 'right_y=', None)
+                RigZStart = GetPositionAtLength(platforms.data[f"PLATFORM_{i}"], 'right_z=', None)
+                UpXStart = GetPositionAtLength(platforms.data[f"PLATFORM_{i}"], 'up_x=', None)
+                UpYStart = GetPositionAtLength(platforms.data[f"PLATFORM_{i}"], 'up_y=', None)
+                UpZStart = GetPositionAtLength(platforms.data[f"PLATFORM_{i}"], 'up_z=', None)
+                ForXStart = GetPositionAtLength(platforms.data[f"PLATFORM_{i}"], 'forward_x=', None)
+                ForYStart = GetPositionAtLength(platforms.data[f"PLATFORM_{i}"], 'forward_y=', None)
+                ForZStart = GetPositionAtLength(platforms.data[f"PLATFORM_{i}"], 'forward_z=', None)
+                
+                platforms.data[f"PLATFORM_{i}_posx"] = GetValueAtExpressionLength(PosXStart+7, PosXStart+64, r'-?\d+\.?\d*"', 'y', platforms.data[f"PLATFORM_{i}"])
+                platforms.data[f"PLATFORM_{i}_posy"] = GetValueAtExpressionLength(PosYStart+7, PosYStart+64, r'-?\d+\.?\d*"', 'y', platforms.data[f"PLATFORM_{i}"])
+                platforms.data[f"PLATFORM_{i}_posz"] = GetValueAtExpressionLength(PosZStart+7, PosZStart+64, r'-?\d+\.?\d*"', 'y', platforms.data[f"PLATFORM_{i}"])
+                PosX = platforms.data[f"PLATFORM_{i}_posx"]
+                PosY = platforms.data[f"PLATFORM_{i}_posy"]
+                PosZ = platforms.data[f"PLATFORM_{i}_posz"]
+                RigX = GetValueAtExpressionLength(RigXStart+9, RigXStart+64, r'-?\d+\.?\d*"', 'y', platforms.data[f"PLATFORM_{i}"])
+                RigY = GetValueAtExpressionLength(RigYStart+9, RigYStart+64, r'-?\d+\.?\d*"', 'y', platforms.data[f"PLATFORM_{i}"])
+                RigZ = GetValueAtExpressionLength(RigZStart+9, RigZStart+64, r'-?\d+\.?\d*"', 'y', platforms.data[f"PLATFORM_{i}"])
+                UpX = GetValueAtExpressionLength(UpXStart+6, UpXStart+64, r'-?\d+\.?\d*"', 'y', platforms.data[f"PLATFORM_{i}"])
+                UpY = GetValueAtExpressionLength(UpYStart+6, UpYStart+64, r'-?\d+\.?\d*"', 'y', platforms.data[f"PLATFORM_{i}"])
+                UpZ = GetValueAtExpressionLength(UpZStart+6, UpZStart+64, r'-?\d+\.?\d*"', 'y', platforms.data[f"PLATFORM_{i}"])
+                ForX = GetValueAtExpressionLength(ForXStart+11, ForXStart+64, r'-?\d+\.?\d*"', 'y', platforms.data[f"PLATFORM_{i}"])
+                ForY = GetValueAtExpressionLength(ForYStart+11, ForYStart+64, r'-?\d+\.?\d*"', 'y', platforms.data[f"PLATFORM_{i}"])
+                ForZ = GetValueAtExpressionLength(ForZStart+11, ForZStart+64, r'-?\d+\.?\d*"', 'y', platforms.data[f"PLATFORM_{i}"])
+            with bpy.data.libraries.load(str(file_path)) as (data_from, data_to):
+                for name in data_from.objects:
+                    if name == platforms.data[f"PLATFORM_{i}_name"]:
+                        data_to.objects = [name]
+            
+            level = bpy.data.collections['level']
+            
+            for obj in data_to.objects:
+                SetupPosition(obj, PosX, PosY, PosZ)
+                SetupRotation(obj, RigX, RigY, RigZ, UpX, UpY, UpZ, ForX, ForY, ForZ)
+                level.objects.link(obj)
+    
+    def ReadRails():
+        if Rails.Instances == 0:
+            return
+        setattr(rails, 'data', OrderedDict())
+        for i in range(Rails.Instances):
+            i += 1
+            if (i == 1):
+                start = GetPositionAtLength(LevelFull, '<object type="RAIL', None)
+                end = GetPositionAtLength(LevelFull, '/>', start)
+                #print(start, end)
+            else:
+                start = GetPositionAtLength(LevelFull, '<object type="RAIL', rails.data['Where'] + 1)
+                end = GetPositionAtLength(LevelFull, '/>', start)
+            rails.data['Where'] = start
+            rails.data['WhereToEnd'] = end
+            TempRail = ''
+            rails.data[f"RAIL_{i}"] = ''
+            
+            # Fixed with a buffer of 2 on the end string
+            for index in range(start, end+2):
+                rails.data[f"RAIL_{i}"] += LevelFull[index]
+                #print(LevelFull[index])
+            
+            for index in range(0, len(rails.data[f"RAIL_{i}"])):
+                #print(playerspawnpoints.data[f"PLAYER_SPAWNPOINT_{i}"])
+                rails.data[f"RAIL_{i}_name_start"] = GetPositionAtLength(rails.data[f"RAIL_{i}"], 'type=', None)
+                namestart = rails.data[f"RAIL_{i}_name_start"]
+                rails.data[f"RAIL_{i}_name"] = GetValueAtLength(namestart+6, namestart+128, '"', None, 'y', rails.data[f"RAIL_{i}"])
+                rails.data[f"RAIL_{i}_name"] = GetValueAtLength(namestart+6, namestart+50, '"', None, 'y', rails.data[f"RAIL_{i}"])
+                rails.data[f"RAIL_{i}_posx_start"] = GetPositionAtLength(rails.data[f"RAIL_{i}"], 'pos_x=', None)
+                rails.data[f"RAIL_{i}_posy_start"] = GetPositionAtLength(rails.data[f"RAIL_{i}"], 'pos_y=', None)
+                rails.data[f"RAIL_{i}_posz_start"] = GetPositionAtLength(rails.data[f"RAIL_{i}"], 'pos_z=', None)
+                PosXStart = rails.data[f"RAIL_{i}_posx_start"]
+                PosYStart = rails.data[f"RAIL_{i}_posy_start"]
+                PosZStart = rails.data[f"RAIL_{i}_posz_start"]
+                RigXStart = GetPositionAtLength(rails.data[f"RAIL_{i}"], 'right_x=', None)
+                RigYStart = GetPositionAtLength(rails.data[f"RAIL_{i}"], 'right_y=', None)
+                RigZStart = GetPositionAtLength(rails.data[f"RAIL_{i}"], 'right_z=', None)
+                UpXStart = GetPositionAtLength(rails.data[f"RAIL_{i}"], 'up_x=', None)
+                UpYStart = GetPositionAtLength(rails.data[f"RAIL_{i}"], 'up_y=', None)
+                UpZStart = GetPositionAtLength(rails.data[f"RAIL_{i}"], 'up_z=', None)
+                ForXStart = GetPositionAtLength(rails.data[f"RAIL_{i}"], 'forward_x=', None)
+                ForYStart = GetPositionAtLength(rails.data[f"RAIL_{i}"], 'forward_y=', None)
+                ForZStart = GetPositionAtLength(rails.data[f"RAIL_{i}"], 'forward_z=', None)
+                
+                rails.data[f"RAIL_{i}_posx"] = GetValueAtExpressionLength(PosXStart+7, PosXStart+64, r'-?\d+\.?\d*"', 'y', rails.data[f"RAIL_{i}"])
+                rails.data[f"RAIL_{i}_posy"] = GetValueAtExpressionLength(PosYStart+7, PosYStart+64, r'-?\d+\.?\d*"', 'y', rails.data[f"RAIL_{i}"])
+                rails.data[f"RAIL_{i}_posz"] = GetValueAtExpressionLength(PosZStart+7, PosZStart+64, r'-?\d+\.?\d*"', 'y', rails.data[f"RAIL_{i}"])
+                PosX = rails.data[f"RAIL_{i}_posx"]
+                PosY = rails.data[f"RAIL_{i}_posy"]
+                PosZ = rails.data[f"RAIL_{i}_posz"]
+                RigX = GetValueAtExpressionLength(RigXStart+9, RigXStart+64, r'-?\d+\.?\d*"', 'y', rails.data[f"RAIL_{i}"])
+                RigY = GetValueAtExpressionLength(RigYStart+9, RigYStart+64, r'-?\d+\.?\d*"', 'y', rails.data[f"RAIL_{i}"])
+                RigZ = GetValueAtExpressionLength(RigZStart+9, RigZStart+64, r'-?\d+\.?\d*"', 'y', rails.data[f"RAIL_{i}"])
+                UpX = GetValueAtExpressionLength(UpXStart+6, UpXStart+64, r'-?\d+\.?\d*"', 'y', rails.data[f"RAIL_{i}"])
+                UpY = GetValueAtExpressionLength(UpYStart+6, UpYStart+64, r'-?\d+\.?\d*"', 'y', rails.data[f"RAIL_{i}"])
+                UpZ = GetValueAtExpressionLength(UpZStart+6, UpZStart+64, r'-?\d+\.?\d*"', 'y', rails.data[f"RAIL_{i}"])
+                ForX = GetValueAtExpressionLength(ForXStart+11, ForXStart+64, r'-?\d+\.?\d*"', 'y', rails.data[f"RAIL_{i}"])
+                ForY = GetValueAtExpressionLength(ForYStart+11, ForYStart+64, r'-?\d+\.?\d*"', 'y', rails.data[f"RAIL_{i}"])
+                ForZ = GetValueAtExpressionLength(ForZStart+11, ForZStart+64, r'-?\d+\.?\d*"', 'y', rails.data[f"RAIL_{i}"])
+            with bpy.data.libraries.load(str(file_path)) as (data_from, data_to):
+                for name in data_from.objects:
+                    if name == rails.data[f"RAIL_{i}_name"]:
+                        data_to.objects = [name]
+            
+            level = bpy.data.collections['level']
+            
+            for obj in data_to.objects:
+                SetupPosition(obj, PosX, PosY, PosZ)
+                SetupRotation(obj, RigX, RigY, RigZ, UpX, UpY, UpZ, ForX, ForY, ForZ)
+                level.objects.link(obj)
+    
+    ReadPlayerSpawnpoints()
+    ReadBridges()
+    ReadPoles()
+    ReadWaypoints()
+    ReadCheckpoints()
+    ReadMorphs()
+    ReadPumps()
+    ReadGyrocopters()
+    ReadGenerators()
+    ReadWoodcrates()
+    ReadMetalcrates()
+    ReadPlatforms()
+    ReadRails()
             
 def Level_Button(context, directory):
     print(directory)
     CustomLevel=open(directory + '\\CustomLevel.vnl', 'w')
+
+    # rounds negative exponents
+    def RNEXP(float):
+        return round(float, 7)
+    
+    # rounds zero point exponents
+    def REXP(float):
+        return round(float, 6)
+    
+    def CheckRight(direction, axis, value):
+        RoundedValue = (value < 0) and -RNEXP(value) or REXP(value)
+        if (direction == 'up' and axis == 'x' and RoundedValue == float(1)) or (direction == 'up' and axis == 'x' and RoundedValue == float(-1)):
+            return 'x'
+        if (direction == 'up' and axis == 'y' and RoundedValue == float(1)) or (direction == 'up' and axis == 'y' and RoundedValue == float(-1)):
+            return 'y'
+        if (direction == 'up' and axis == 'z' and RoundedValue == float(1)) or (direction == 'up' and axis == 'z' and RoundedValue == float(-1)):
+            return 'z'
+    
+    def CheckUp(direction, axis, value):
+        RoundedValue = REXP(value)
+        if (direction == 'up' and axis == 'x' and RoundedValue == 1) or (direction == 'up' and axis == 'x' and RoundedValue == -1):
+            return 'x'
+        if (direction == 'up' and axis == 'y' and RoundedValue == 1) or (direction == 'up' and axis == 'y' and RoundedValue == -1):
+            return 'y'
+        if (direction == 'up' and axis == 'z' and RoundedValue == 1) or (direction == 'up' and axis == 'z' and RoundedValue == -1):
+            return 'z'
+    
+    def CheckForward(direction, axis, value):
+        RoundedValue = (value < 0) and -RNEXP(value) or REXP(value)
+        if (direction == 'up' and axis == 'x' and RoundedValue == float(1)) or (direction == 'up' and axis == 'x' and RoundedValue == float(-1)):
+            return 'x'
+        if (direction == 'up' and axis == 'y' and RoundedValue == float(1)) or (direction == 'up' and axis == 'y' and RoundedValue == float(-1)):
+            return 'y'
+        if (direction == 'up' and axis == 'z' and RoundedValue == float(1)) or (direction == 'up' and axis == 'z' and RoundedValue == float(-1)):
+            return 'z'
+    
+    def CheckOne(value):
+        if REXP(value) == float(1):
+            return True
+        else:
+            return False
+    
+    def CheckNegOne(value):
+        if REXP(value) == float(-1):
+            return True
+        else:
+            return False
          
     axis = ['x','y','z']
     direction = ['right','up','forward']
@@ -112,6 +1992,9 @@ def Level_Button(context, directory):
     RigX, RigY, RigZ = 0,0,0
     UpX, UpY, UpZ = 0,0,0
     ForX, ForY, ForZ = 0,0,0
+
+    Neg_zero = -4.371138828673793e-08
+    Neg_one = -1.1920928955078125e-07
     
     # you can only have a maximum number of 65535 id's so 65535 objects
     # here are the reservations
@@ -120,7 +2003,7 @@ def Level_Button(context, directory):
     # 1 id needs to be reserved for the player ball, if multiplayer gets back up and running, save 4 to 8 ids depending on the gamemode
     # 64535-65534 are for fitpoints, 999 fitpoints soft max, 64534 is the buffer
     # 60002-64533 are for waypoints and other invisible objects, as well as checkpoints and gyrocopter, yes I'm biased to fitpoints, 4531 waypoints max, even tho these should be flipped I won't, 60001 is the buffer    
-    # 50002-60000 are for objects that run using Switches
+    # 50002-60000 are for objects that run using Switches, please subtract these numbers to know the total amount of object types you can use
     # all relevant comments above will be added to switchable objects description in their Object->Custom Properties
     
     #if bpy.context.selected_objects[0].children:
@@ -135,298 +2018,6 @@ def Level_Button(context, directory):
     # nor  any of the other aformentioned objects
     
     # creation functions
-    
-    def CheckDoubleRotation(rot1, rot2):
-        if (rot1 != 1 and rot1 != -1 and rot1 != 0 and rot1 != -0) and (rot2 != 1 and rot2 != -1 and rot2 != 0 and rot2 != -0):
-            return True
-        else:
-            return False
-    
-    def SetupRotation(obj):
-        # quaternion rotations
-        # kudos to me I fixed the code, it looks so nice right now!
-        for n, vectors in enumerate(obj.rotation_quaternion.to_matrix()):
-            for i, float in enumerate(vectors):
-                # setting up cross vector checks
-                QuatToMatrix = obj.rotation_quaternion.to_matrix()
-                RigX = REXP(QuatToMatrix[0][0])
-                RigY = REXP(QuatToMatrix[0][1])
-                RigZ = REXP(QuatToMatrix[0][2])
-                UpX = REXP(QuatToMatrix[1][0])
-                UpY = REXP(QuatToMatrix[1][1])
-                UpZ = REXP(QuatToMatrix[1][2])
-                ForX = REXP(QuatToMatrix[2][0])
-                ForY = REXP(QuatToMatrix[2][1])
-                ForZ = REXP(QuatToMatrix[2][2])
-                
-                # revamped quaternions
-                # still no free form rotations
-                if direction[n] == 'right' and axis[i] == 'x' and (UpY == 1) and (ForZ == 1):# Facing Forward
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(RigY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(RigZ)+'" ')
-                elif direction[n] == 'up' and axis[i] == 'y' and (RigX == 1) and (ForZ == 1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(UpX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(UpZ)+'" ')
-                elif direction[n] == 'forward' and axis[i] == 'z' and (RigX == 1) and (UpY == 1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(ForX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(ForY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(ForZ)+'" ')
-                elif direction[n] == 'right' and axis[i] == 'y' and (UpX == 1) and (ForZ == 1): # Facing Right
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(RigX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigZ)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(-RigY)+'" ')
-                elif direction[n] == 'up' and axis[i] == 'x' and (RigY == -1) and (ForZ == 1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(UpX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(UpZ)+'" ')
-                elif direction[n] == 'forward' and axis[i] == 'z' and (RigY == -1) and (UpX == 1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(-ForZ)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(ForY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(ForX)+'" ')
-                elif direction[n] == 'right' and axis[i] == 'y' and (UpX == -1) and (ForZ == 1): # Facing Left
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(RigX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigZ)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(-RigY)+'" ')
-                elif direction[n] == 'up' and axis[i] == 'x' and (RigY == 1) and (ForZ == 1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(-UpX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(UpZ)+'" ')
-                elif direction[n] == 'forward' and axis[i] == 'z' and (RigY == 1) and (UpX == -1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(ForZ)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(ForY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(ForX)+'" ')
-                elif direction[n] == 'right' and axis[i] == 'x' and (UpY == -1) and (ForZ == 1): # Facing Backward
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(RigY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(RigZ)+'" ')
-                elif direction[n] == 'up' and axis[i] == 'y' and (RigX == -1) and (ForZ == 1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(UpX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(-UpY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(UpZ)+'" ')
-                elif direction[n] == 'forward' and axis[i] == 'z' and (RigX == -1) and (UpY == -1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(ForX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(ForY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(-ForZ)+'" ')
-                elif direction[n] == 'right' and axis[i] == 'x' and (UpY == -1) and (ForZ == -1):# Facing Forward-
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(RigY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(RigZ)+'" ')
-                elif direction[n] == 'up' and axis[i] == 'y' and (RigX == 1) and (ForZ == -1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(UpX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(UpZ)+'" ')
-                elif direction[n] == 'forward' and axis[i] == 'z' and (RigX == 1) and (UpY == -1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(ForX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(ForY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(ForZ)+'" ')
-                elif direction[n] == 'right' and axis[i] == 'y' and (UpX == 1) and (ForZ == -1): # Facing Right-
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(RigX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigZ)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(RigY)+'" ')
-                elif direction[n] == 'up' and axis[i] == 'x' and (RigY == 1) and (ForZ == -1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(-UpX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(UpZ)+'" ')
-                elif direction[n] == 'forward' and axis[i] == 'z' and (RigY == 1) and (UpX == 1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(-ForZ)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(ForY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(ForX)+'" ')
-                elif direction[n] == 'right' and axis[i] == 'y' and (UpX == -1) and (ForZ == -1): # Facing Left-
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(RigX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigZ)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(RigY)+'" ')
-                elif direction[n] == 'up' and axis[i] == 'x' and (RigY == -1) and (ForZ == -1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(UpX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(UpZ)+'" ')
-                elif direction[n] == 'forward' and axis[i] == 'z' and (RigY == -1) and (UpX == -1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(ForZ)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(ForY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(ForX)+'" ')
-                elif direction[n] == 'right' and axis[i] == 'x' and (UpY == 1) and (ForZ == -1): # Facing Backward-
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(RigY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(RigZ)+'" ')
-                elif direction[n] == 'up' and axis[i] == 'y' and (RigX == -1) and (ForZ == -1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(UpX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(-UpY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(UpZ)+'" ')
-                elif direction[n] == 'forward' and axis[i] == 'z' and (RigX == -1) and (UpY == 1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(ForX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(ForY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(-ForZ)+'" ')
-                elif direction[n] == 'right' and axis[i] == 'z' and (UpY == 1) and (ForX == -1): #Facing Sideways >
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(RigX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(-RigZ)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigY)+'" ')
-                elif direction[n] == 'up' and axis[i] == 'y' and (RigZ == 1) and (ForX == -1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(UpY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(UpZ)+'" ')
-                elif direction[n] == 'forward' and axis[i] == 'x' and (UpY == 1) and (RigZ == 1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(ForZ)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(ForY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(-ForX)+'" ')
-                elif direction[n] == 'right' and axis[i] == 'z' and (UpY == -1) and (ForX == -1): #Facing Sideways > Flipped
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(RigX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(RigZ)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigY)+'" ')
-                elif direction[n] == 'up' and axis[i] == 'y' and (RigZ == -1) and (ForX == -1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(UpY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(UpZ)+'" ')
-                elif direction[n] == 'forward' and axis[i] == 'x' and (UpY == -1) and (RigZ == -1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(ForZ)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(ForY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(ForX)+'" ')
-                elif direction[n] == 'right' and axis[i] == 'y' and (UpZ == -1) and (ForX == -1): #Sideways > Facing front
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(RigX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(-RigY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(RigZ)+'" ')
-                elif direction[n] == 'up' and axis[i] == 'z' and (RigY == 1) and (ForX == -1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(UpX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(UpY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpZ)+'" ')
-                elif direction[n] == 'forward' and axis[i] == 'x' and (UpZ == -1) and (RigY == 1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(-ForX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(ForY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(ForZ)+'" ')
-                elif direction[n] == 'right' and axis[i] == 'y' and (UpZ == 1) and (ForX == -1): #Sideways > Facing back
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(RigX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(RigZ)+'" ')
-                elif direction[n] == 'up' and axis[i] == 'z' and (RigY == -1) and (ForX == -1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(UpX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(UpY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpZ)+'" ')
-                elif direction[n] == 'forward' and axis[i] == 'x' and (UpZ == 1) and (RigY == -1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(-ForX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(ForY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(ForZ)+'" ')
-                elif direction[n] == 'right' and axis[i] == 'z' and (UpY == 1) and (ForX == 1): #Facing Sideways <
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(RigX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(-RigZ)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigY)+'" ')
-                elif direction[n] == 'up' and axis[i] == 'y' and (RigZ == -1) and (ForX == 1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(-UpY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(UpZ)+'" ')
-                elif direction[n] == 'forward' and axis[i] == 'x' and (UpY == 1) and (RigZ == -1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(ForZ)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(ForY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(ForX)+'" ')
-                elif direction[n] == 'right' and axis[i] == 'z' and (UpY == -1) and (ForX == 1): #Facing Sideways < Flipped
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(RigX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(RigZ)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigY)+'" ')
-                elif direction[n] == 'up' and axis[i] == 'y' and (RigZ == 1) and (ForX == 1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(-UpY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(UpZ)+'" ')
-                elif direction[n] == 'forward' and axis[i] == 'x' and (UpY == -1) and (RigZ == 1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(ForZ)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(ForY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(-ForX)+'" ')
-                elif direction[n] == 'right' and axis[i] == 'y' and (RigY == -1) and (ForX == 1): #Sideways < Facing back
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(RigX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(-RigY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(RigZ)+'" ')
-                elif direction[n] == 'up' and axis[i] == 'z' and (UpZ == -1) and (ForX == 1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(UpX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(UpY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpZ)+'" ')
-                elif direction[n] == 'forward' and axis[i] == 'x' and (RigY == -1) and (UpZ == -1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(-ForX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(ForY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(ForZ)+'" ')
-                elif direction[n] == 'right' and axis[i] == 'y' and (RigY == 1) and (ForX == 1): #Sideways < Facing front
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(RigX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(RigZ)+'" ')
-                elif direction[n] == 'up' and axis[i] == 'z' and (UpZ == 1) and (ForX == 1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(UpX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(UpY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(-UpZ)+'" ')
-                elif direction[n] == 'forward' and axis[i] == 'x' and (RigY == 1) and (UpZ == 1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(ForX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(ForY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(ForZ)+'" ')
-                elif direction[n] == 'right' and axis[i] == 'x' and (UpZ == -1) and (ForY == 1): #Top
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(RigY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(RigZ)+'" ')
-                elif direction[n] == 'up' and axis[i] == 'z' and (RigX == 1) and (ForY == 1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(UpX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(UpY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpZ)+'" ')
-                elif direction[n] == 'forward' and axis[i] == 'y' and (RigX == 1) and (UpZ == -1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(ForX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(ForY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(ForZ)+'" ')
-                elif direction[n] == 'right' and axis[i] == 'x' and (UpZ == -1) and (ForY == -1): #Top Flipped
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(RigY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(RigZ)+'" ')
-                elif direction[n] == 'up' and axis[i] == 'z' and (RigX == -1) and (ForY == -1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(UpX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(UpY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpZ)+'" ')
-                elif direction[n] == 'forward' and axis[i] == 'y' and (RigX == -1) and (UpZ == -1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(ForX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(ForY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(ForZ)+'" ')
-                elif direction[n] == 'right' and axis[i] == 'x' and (UpZ == 1) and (ForY == -1): #Bottom
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(RigY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(RigZ)+'" ')
-                elif direction[n] == 'up' and axis[i] == 'z' and (RigX == 1) and (ForY == -1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(UpX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(UpY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpZ)+'" ')
-                elif direction[n] == 'forward' and axis[i] == 'y' and (RigX == 1) and (UpZ == 1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(ForX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(ForY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(ForZ)+'" ')
-                elif direction[n] == 'right' and axis[i] == 'x' and (UpZ == 1) and (ForY == 1): #Bottom Flipped
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(RigX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(RigY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(RigZ)+'" ')
-                elif direction[n] == 'up' and axis[i] == 'z' and (RigX == -1) and (ForY == 1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(UpX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(UpY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(UpZ)+'" ')
-                elif direction[n] == 'forward' and axis[i] == 'y' and (RigX == -1) and (UpZ == 1):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(ForX)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(ForY)+'" ')
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(ForZ)+'" ')
-                # free form rotation, left and right only...
-                if (direction[n] == 'right' and axis[i] == 'x' and CheckDoubleRotation(RigX, RigY) and (RigY < 0)): # rot left
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="'+str(-RigX)+'" '))
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="'+str(RigZ)+'" '))
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="'+str(RigY)+'" '))
-                if (direction[n] == 'up' and axis[i] == 'y' and CheckDoubleRotation(UpX, UpY) and (RigY < 0)):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="'+str(ForX)+'" '))
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="'+str(ForZ)+'" '))
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="'+str(ForY)+'" '))
-                if (direction[n] == 'forward' and axis[i] == 'z' and CheckDoubleRotation(RigX, RigY) and CheckDoubleRotation(UpX, UpY) and (RigY < 0)):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="'+str(UpX)+'" '))
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="'+str(ForY)+'" '))
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="'+str(-UpY)+'" '))
-                if (direction[n] == 'right' and axis[i] == 'x' and CheckDoubleRotation(RigX, RigY) and (RigY > 0)): # rot right
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="'+str(RigX)+'" '))
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="'+str(RigZ)+'" '))
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="'+str(RigY)+'" '))
-                if (direction[n] == 'up' and axis[i] == 'y' and CheckDoubleRotation(UpX, UpY) and (RigY > 0)):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="'+str(ForX)+'" '))
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="'+str(ForZ)+'" '))
-                    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="'+str(ForY)+'" '))
-                if (direction[n] == 'forward' and axis[i] == 'z' and CheckDoubleRotation(RigX, RigY) and CheckDoubleRotation(UpX, UpY) and (RigY > 0)):
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="'+str(UpX)+'" '))
-                    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="'+str(ForY)+'" '))
-                    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="'+str(UpY)+'" '))
-        
     
     def WritePartialObject(Object):
         # name and ID
@@ -443,11 +2034,39 @@ def Level_Button(context, directory):
             if (Object['id'] != BufferI or Object['id'] != BufferS):
                 CustomLevel.write('id="'+str(Object['id'])+'" ')
             
-        SetupRotation(Object)
+        # quaternion rotations
+        # kudos to me I fixed the code, and it looks so nice right now!
+        matrix = obj.rotation_quaternion.to_matrix()
+        Object.rotation_mode = 'QUATERNION'
+        QuatToMatrix = obj.rotation_quaternion.to_matrix()
+        
+        RigX = QuatToMatrix[0][0]
+        RigY = QuatToMatrix[0][1]
+        RigZ = QuatToMatrix[0][2]
+        UpX = QuatToMatrix[1][0]
+        UpY = QuatToMatrix[1][1]
+        UpZ = QuatToMatrix[1][2]
+        ForX = QuatToMatrix[2][0]
+        ForY = QuatToMatrix[2][1]
+        ForZ = QuatToMatrix[2][2]
+        Quat = obj.rotation_quaternion
+        
+        CompileRotationFixed(CustomLevel, RigX, RigY, RigZ, UpX, UpY, UpZ, ForX, ForY, ForZ, Quat)
+                    #if direction[n] == 'forward' and axis[i] == 'y' and (ForY == 1) and (UpX > 0.000001 and UpX < 0.999999): # free form front to right side rotation
+                    #    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(ForX))+'" ')
+                    #    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForY))+'" ')
+                    #    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(ForZ))+'" ')
+                    #if direction[n] == 'forward' and axis[i] == 'y' and (ForY == 1) and (UpX < -0.000001 and UpX > -0.999999): # free form front to left side rotation
+                    #    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(ForX))+'" ')
+                    #    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForY))+'" ')
+                    #    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(ForZ))+'" ')
+                    
+                    
+                
         # location
         CustomLevel.write(str('pos_x="'+str(obj.location.x))+'" ')
         CustomLevel.write(str('pos_y="'+str(obj.location.z))+'" ')
-        CustomLevel.write(str('pos_z="'+str(obj.location.y))+'" >') #is open for insertion
+        CustomLevel.write(str('pos_z="'+str(obj.location.y))+'">') #is open for insertion
     
     def WriteChildObject(Object):
         if Object.name.find(".") != -1:
@@ -457,7 +2076,22 @@ def Level_Button(context, directory):
         
         CustomLevel.write('id="'+str(num)+'" ')
             
-        SetupRotation(Object)
+        matrix = obj.rotation_quaternion.to_matrix()
+        Object.rotation_mode = 'QUATERNION'
+        QuatToMatrix = obj.rotation_quaternion.to_matrix()
+        
+        RigX = QuatToMatrix[0][0]
+        RigY = QuatToMatrix[0][1]
+        RigZ = QuatToMatrix[0][2]
+        UpX = QuatToMatrix[1][0]
+        UpY = QuatToMatrix[1][1]
+        UpZ = QuatToMatrix[1][2]
+        ForX = QuatToMatrix[2][0]
+        ForY = QuatToMatrix[2][1]
+        ForZ = QuatToMatrix[2][2]
+        Quat = obj.rotation_quaternion
+        
+        CompileRotationFixed(CustomLevel, RigX, RigY, RigZ, UpX, UpY, UpZ, ForX, ForY, ForZ, Quat)
                 
         CustomLevel.write(str('pos_x="'+str(Object.location.x))+'" ')
         CustomLevel.write(str('pos_y="'+str(Object.location.z))+'" ')
@@ -478,7 +2112,108 @@ def Level_Button(context, directory):
             if (Object['id'] != BufferI or Object['id'] != BufferS):
                 CustomLevel.write('id="'+str(Object['id'])+'" ')
             
-        SetupRotation(Object)
+        # quaternion rotations
+        # kudos to me I fixed the code, it looks so nice right now!
+        matrix = obj.rotation_quaternion.to_matrix()
+        Object.rotation_mode = 'QUATERNION'
+        QuatToMatrix = obj.rotation_quaternion.to_matrix()
+        
+        RigX = QuatToMatrix[0][0]
+        RigY = QuatToMatrix[0][1]
+        RigZ = QuatToMatrix[0][2]
+        UpX = QuatToMatrix[1][0]
+        UpY = QuatToMatrix[1][1]
+        UpZ = QuatToMatrix[1][2]
+        ForX = QuatToMatrix[2][0]
+        ForY = QuatToMatrix[2][1]
+        ForZ = QuatToMatrix[2][2]
+        Quat = obj.rotation_quaternion
+        
+        CompileRotationFixed(CustomLevel, RigX, RigY, RigZ, UpX, UpY, UpZ, ForX, ForY, ForZ, Quat)
+                
+                
+                    #if direction[n] == 'forward' and axis[i] == 'y' and (ForY == 1) and (UpX > 0.000001 and UpX < 0.999999): # free form front to right side rotation
+                    #    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(ForX))+'" ')
+                    #    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForY))+'" ')
+                    #    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(ForZ))+'" ')
+                    #    continue
+                    #if direction[n] == 'forward' and axis[i] == 'y' and (ForY == 1) and (UpX < -0.000001 and UpX > -0.999999): # free form front to left side rotation
+                    #    CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(ForX))+'" ')
+                    #    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(ForY))+'" ')
+                    #    CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(ForZ))+'" ')
+                    #    continue
+                #CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
+                #RigX, RigY, RigZ = 0,0,0
+                #UpX, UpY, UpZ = 0,0,0
+                #ForX, ForY, ForZ = 0,0,0
+                #if direction[n] == 'up' and axis[i] == 'y':
+                #    UpX = REXP(vectors[i-1])
+                #    UpY = REXP(vectors[i])
+                #    UpZ = REXP(vectors[i+1])
+                #if direction[n] == 'right' and (UpX == -1 or UpX == 1):
+                #    CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
+                #UpY = (direction[n] == 'up' and axis[i] == 'y') and REXP(float)
+                #CustomLevel.write(str(UpY))
+                #CustomLevel.write(str(float))
+                #if direction[n] == 'right' and axis[i] == 'x': # facing any 90 degree angle
+                #    if (REXP(vectors[i]) == -1 or REXP(vectors[i]) == 1) or (REXP(vectors[i+1]) == -1 or REXP(vectors[i+1]) == 1) or (REXP(vectors[i+2]) == -1 or REXP(vectors[i+2]) == 1):
+                #        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
+                #        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
+                #        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(vectors[i+2]))+'" ')
+                #    else: # facing decimal proportions
+                #        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
+                #        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
+                #        CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(vectors[i+2]))+'" ')
+                #if direction[n] == 'up' and axis[i] == 'y': # facing any 90 degree angle
+                #    if (REXP(vectors[i-1]) == -1 or REXP(vectors[i-1]) == 1) or (REXP(vectors[i]) == -1 or REXP(vectors[i]) == 1) or (REXP(vectors[i+1]) == -1 or REXP(vectors[i+1]) == 1):
+                #        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
+                #        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
+                #        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
+                #    else: # facing decimal proportions
+                #        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
+                #        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
+                #        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
+                #if direction[n] == 'forward' and axis[i] == 'z': # facing any 90 degree angle
+                #    if (REXP(vectors[i-2]) == -1 or REXP(vectors[i-2]) == 1) or (REXP(vectors[i-1]) == -1 or REXP(vectors[i-1]) == 1) or (REXP(vectors[i]) == -1 or REXP(vectors[i]) == 1):
+                #        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
+                #        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
+                #        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
+                #    else: # facing decimal proportions
+                #        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
+                #        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
+                #        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
+                #if direction[n] == 'up' and axis[i] == 'y': # positioned up+ and up-
+                #    if REXP(vectors[i]) != 0:
+                #        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
+                #        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
+                #        CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
+                #else:
+                #    if direction[n] == 'up' and axis[i] == 'z': # positioned on front or back
+                #        if (REXP(vectors[i]) == -1 or REXP(vectors[i]) == 1):
+                #            CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
+                #            CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
+                #            CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
+                #    if direction[n] == 'up' and axis[i] == 'x': # positioned on side
+                #        if (REXP(vectors[i]) == -1 or REXP(vectors[i]) == 1):
+                #            CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
+                #            CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
+                #            CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(vectors[i+2]))+'" ')
+                #if direction[n] == 'forward' and axis[i] == 'z': # facing forward
+                #    if REXP(vectors[i]) != 0:
+                #        CustomLevel.write(str(direction[n]+'_'+axis[i-2]+'="')+str(REXP(vectors[i-2]))+'" ')
+                #        CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
+                #        CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
+                #else:
+                #    if direction[n] == 'forward' and axis[i] == 'x': # facing right
+                #        if (REXP(vectors[i]) == -1 or REXP(vectors[i]) == 1):
+                #            CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
+                #            CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
+                #            CustomLevel.write(str(direction[n]+'_'+axis[i+2]+'="')+str(REXP(vectors[i+2]))+'" ')
+                #    if direction[n] == 'forward' and axis[i] == 'y': # positioned on front or back
+                #        if (REXP(vectors[i]) == -1 or REXP(vectors[i]) == 1):
+                #            CustomLevel.write(str(direction[n]+'_'+axis[i-1]+'="')+str(REXP(vectors[i-1]))+'" ')
+                #            CustomLevel.write(str(direction[n]+'_'+axis[i]+'="')+str(REXP(vectors[i]))+'" ')
+                #            CustomLevel.write(str(direction[n]+'_'+axis[i+1]+'="')+str(REXP(vectors[i+1]))+'" ')
         # location
         CustomLevel.write(str('pos_x="'+str(obj.location.x))+'" ')
         CustomLevel.write(str('pos_y="'+str(obj.location.z))+'" ')
@@ -506,6 +2241,8 @@ def Level_Button(context, directory):
         size = Object.get('size')
         third_object_to_activate = Object.get('third_object_to_activate')
         time = Object.get('time')
+        fluid_collision = Object.get('fluid_collision')
+        cloth_collision = Object.get('cloth_collision')
         
         # optional params, won't crash so I guess you can make troll levels :)
         active_on_startup = Object.get('active_on_startup')
@@ -564,11 +2301,6 @@ def Level_Button(context, directory):
                 if (checkpoint_id) and (checkpoint_id != Buffer):
                     CustomLevel.write(str('\n\t\t\t<param name="checkpoint_id" value='+'"'+str(checkpoint_id)+'" data_type="int" />'))
             
-            def AttachedTo():
-                Buffer = 60001
-                if (attached_to_id) and (attached_to_id != Buffer):
-                    CustomLevel.write(str('\n\t\t\t<param name="attached_to_id" value='+'"'+str(attached_to_id)+'" data_type="int" />'))
-            
             def BehaviourOptional(val):
                 if behaviour:
                     for index, value in enumerate(Object['behaviour'].to_list()):
@@ -584,7 +2316,22 @@ def Level_Button(context, directory):
                             val = mechanic_set[index]
                             break
                     CustomLevel.write(str('\n\t\t\t<param name="mechanic" value='+'"'+val+'" data_type="bool" />'))
-                
+            
+            def ClothCollision(val):
+                if cloth_collision:
+                    for index, value in enumerate(Object['cloth_collision'].to_list()):
+                        if (value == True):
+                            val = cloth_collision_set[index]
+                            break
+                    CustomLevel.write(str('\n\t\t\t<param name="cloth_collision" value='+'"'+val+'" data_type="bool" />'))
+            
+            def FluidCollision(val):
+                if fluid_collision:
+                    for index, value in enumerate(Object['fluid_collision'].to_list()):
+                        if (value == True):
+                            val = fluid_collision_set[index]
+                            break
+                    CustomLevel.write(str('\n\t\t\t<param name="fluid_collision" value='+'"'+val+'" data_type="bool" />'))
             
             def ActiveStartupOptional(val):
                 if active_on_startup:
@@ -738,47 +2485,17 @@ def Level_Button(context, directory):
             bool_dynamic_set = ['true', 'false'] # boolean
             first_fitpoint_set = ['true', 'false'] # boolean
             generic_dynamic_set = ['default', 'true', 'false'] # string
+            cloth_collision_set = ['true', 'false'] # boolean
+            fluid_collision_set = ['true', 'false'] # boolean
             mechanic_set = ['true', 'false'] # boolean
             respawn_set = ['true', 'false'] # boolean
             rotation_speed_set = ['none', 'slow', 'medium', 'fast'] # string
             
             if Object.name.find(".") != -1:
                 Object.name = obj.name[:-4]
-            # Barrels
+            
             if ("BARREL_SMALL" in Object.name or "BARREL_MEDIUM" in Object.name or "BARREL_LARGE" in Object.name):
                 val = ""
-                GenericDynamicOptional(val)
-                RespawnOptional(val)
-            # Boards
-            if ("BOARD_CURVED" in Object.name or "BOARD_LARGE" in Object.name or "BOARD_MEDIUM" in Object.name or "BOARD_SMALL" in Object.name or "BOARD_ONE_FIT" in Object.name or "BOARD_QUAD_FIT" in Object.name):
-                val = ""
-                GenericDynamicOptional(val)
-                RespawnOptional(val)
-            # Cannonballs
-            if ("CANNONBALL" in Object.name):
-                val = ""
-                GenericDynamicOptional(val)
-                RespawnOptional(val)
-            # Magnet in rope
-            if ("MAGNET_IN_ROPE" in Object.name):
-                val = ""
-                GenericDynamicOptional(val)
-                RespawnOptional(val)
-            # Planks
-            if ("PLANK" in Object.name):
-                val = ""
-                GenericDynamicOptional(val)
-                RespawnOptional(val)
-            # Stoneballs
-            if ("STONEBALL" in Object.name):
-                val = ""
-                GenericDynamicOptional(val)
-                RespawnOptional(val)
-            # Wood crates
-            if ("WOODCRATE" in Object.name):
-                val = ""
-                GenericDynamicOptional(val)
-                RespawnOptional(val)
             
             if ("CANNON_FOOT" in Object.name):
                 val = ""
@@ -792,10 +2509,13 @@ def Level_Button(context, directory):
                         val = active_on_startup_set[index]
                         break
                 CustomLevel.write(str('\n\t\t\t<param name="active_on_startup" value='+'"'+val+'" data_type="bool" />'))
-                
-            if ("LEVEL_FINISH_POINT" in Object.name):
+            
+            if ("CRATE" in Object.name): # handles both Woodcrate and metal crate
                 val = ""
+                if ("METALCRATE" in Object.name):
+                    ClothCollision(val)
                 GenericDynamicOptional(val)
+                FluidCollision(val)
                 RespawnOptional(val)
                 
             if ("CLOTH_FITPOINT" in Object.name):
@@ -808,7 +2528,11 @@ def Level_Button(context, directory):
                         break
                 CustomLevel.write(str('\n\t\t\t<param name="behaviour" value='+'"'+val+'" data_type="string" />'))
                 
-                GenericDynamicOptional(val)
+                for index, value in enumerate(Object['dynamic'].to_list()):
+                    if (value == True):
+                        val = bool_dynamic_set[index]
+                        break
+                CustomLevel.write(str('\n\t\t\t<param name="dynamic" value='+'"'+val+'" data_type="bool" />'))
                 
                 for index, value in enumerate(Object['first_fitpoint'].to_list()):
                     if (value == True):
@@ -821,7 +2545,11 @@ def Level_Button(context, directory):
                 if (next_fitpoint_id == "+1"):
                     CustomLevel.write(str('\n\t\t\t<param name="next_fitpoint_id" value='+'"'+str(num+1)+'" data_type="int" />'))
                 
-                RespawnOptional(val)
+                for index, value in enumerate(Object['respawn'].to_list()):
+                    if (value == True):
+                        val = respawn_set[index]
+                        break
+                CustomLevel.write(str('\n\t\t\t<param name="respawn" value='+'"'+val+'" data_type="bool" />'))
             
             if ("FAN" in Object.name or "FLOORFAN" in Object.name):
                 val = ""
@@ -1014,19 +2742,6 @@ def Level_Button(context, directory):
         
         CustomLevel.write('\n\t\t</properties>')
         
-        # upon compiling, the spawnpoint will change mesh to the selected ball
-        if ("PLAYER_SPAWNPOINT" in Object.name):
-            val = ""
-            Default = 'PLAYER_SPAWNPOINT'
-            Balls = ['AIRBALL', 'MARBLEBALL', 'POWERBALL', 'STEELBALL']
-            for index, value in enumerate(Object['default_ball'].to_list()):
-                if (value == True):
-                    val = Balls[index]
-                    break
-                else:
-                    Object.data = bpy.data.meshes[str(Default)]
-            Object.data = bpy.data.meshes[str(val)]
-        
         if (Object.get("sign") is not None):
             if (Object['sign'] == "FAN"): #checks for FAN to spawn fan propeller
                 CustomLevel.write('\n\t\t<object type="FAN_PROPELLER" right_x="-1.0" right_y="0.0" right_z="0.0" up_x="0.0" up_y="1.0" up_z="0.0" forward_x="0.0" forward_y="0.0" forward_z="-1.0" pos_x="0" pos_y="0.5" pos_z="-0.329998" />')
@@ -1104,19 +2819,12 @@ def Level_Button(context, directory):
                 CustomLevel.write('\n\t\t<param name="point_light_type" value="'+val+'" data_type="string" />')
             if worldtype:
                 val = ""
-                Default = 'Blank'
-                Worlds = ['Skyworld', 'Iceworld', 'Caveworld', 'Cloudworld', 'Lavaworld']
                 for index, value in enumerate(level['world_type'].to_list()):
                     if (value == True):
                         val = world_type_set[index]
                         break
                 CustomLevel.write('\n\t\t<param name="world_type" value="'+val+'" data_type="string" />')
-                for index, value in enumerate(level['world_type'].to_list()):
-                    if (value == True):
-                        val = Worlds[index]
-                        break
-                bpy.context.scene.world = bpy.data.worlds[str(val)]
-                
+        
         level = bpy.data.collections['level'] #REQUIRED!
         blue = level.get('point_light_blue')
         green = level.get('point_light_green')
@@ -1133,7 +2841,7 @@ def Level_Button(context, directory):
 
     tempnum = 0
 
-    for num,obj in enumerate(bpy.context.selected_objects):
+    for num,obj in enumerate(bpy.data.collections['level'].objects):
         prop = obj.get('prop')
         
         if (not obj.children and not prop):
@@ -1174,7 +2882,7 @@ def Level_Button(context, directory):
     # closes the file, copy all level data in this file to a level of your choice ex: skyworld1.vnl, menu.vnl, etc.
     CustomLevel.close()
 
-class FixNamesOperation(bpy.types.Operator):
+class FixNamesOperation(Operator):
     """Tooltip"""
     bl_idname = "object.fixnames_operator"
     bl_label = "Names"
@@ -1183,7 +2891,7 @@ class FixNamesOperation(bpy.types.Operator):
         FixNames_Button(context)
         return {'FINISHED'}
     
-class FixMeshesOperation(bpy.types.Operator):
+class FixMeshesOperation(Operator):
     """Tooltip"""
     bl_idname = "object.fixmeshes_operator"
     bl_label = "Meshes"
@@ -1191,15 +2899,38 @@ class FixMeshesOperation(bpy.types.Operator):
     def execute(self, context):
         FixMeshes_Button(context)
         return {'FINISHED'}
+    
+class OpenLevelOperation(Operator, ImportHelper):
+    """Opens a switchball vnl file and converts all objects and grabs from Asset Library"""
+    bl_idname = "object.open_operator"
+    bl_label = "Open Level"
+    filename_ext = ".vnl"
+    
+    filter_glob: bpy.props.StringProperty(
+        default = "*.vnl",
+        options = {'HIDDEN'},
+        maxlen = 255,
+    )
+    
+    def execute(self, context):
+        filepath = self.filepath
+        Open_Level_Button(context, filepath)
+        return {'FINISHED'}
+    
+    def invoke(self, context, event):
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+            
 
-class CompileLevelOperation(bpy.types.Operator):
+class CompileLevelOperation(Operator):
     """Compiles all selected objects to a switchball vnl file"""
     bl_idname = "object.compile_operator"
     bl_label = "Compile"
     
     directory: StringProperty(
         name = "Output Path",
-        description = "Where to output")
+        description = "Where to output",
+        subtype = 'DIR_PATH')
         
     def execute(self, context):
         directory = self.directory
@@ -1213,7 +2944,7 @@ class CompileLevelOperation(bpy.types.Operator):
 def menu_func(self, context):
     self.layout.operator(CompileLevelOperation.bl_idname, text=CompileLevelOperation.bl_label)
     
-class FixPanel(bpy.types.Panel):
+class FixPanel(Panel):
     """Creates a Panel in the scene context of the properties editor"""
     bl_label = "Fixer"
     bl_idname = "SCENE_PT_fix"
@@ -1233,7 +2964,7 @@ class FixPanel(bpy.types.Panel):
         row.operator("object.fixnames_operator")
         row.operator("object.fixmeshes_operator")
 
-class CompilerPanel(bpy.types.Panel):
+class CompilerPanel(Panel):
     """Creates a Panel in the scene context of the properties editor"""
     bl_label = "Compilers"
     bl_idname = "SCENE_PT_compile_level"
@@ -1251,12 +2982,14 @@ class CompilerPanel(bpy.types.Panel):
         row = layout.row()
         row.scale_y = 1.0
         row.operator("object.compile_operator")
+        row.operator("object.open_operator")
 
 # Register and add to the "object" menu (required to also use F3 search "Simple Object Operator" for quick access).
 def register():
     #ActiveObject = bpy.context.active_object
     bpy.utils.register_class(CompilerPanel)
     bpy.utils.register_class(CompileLevelOperation)
+    bpy.utils.register_class(OpenLevelOperation)
     bpy.utils.register_class(FixPanel)
     bpy.utils.register_class(FixNamesOperation)
     bpy.utils.register_class(FixMeshesOperation)
@@ -1271,6 +3004,7 @@ def unregister():
     #del ActiveObject
     bpy.utils.unregister_class(CompilerPanel)
     bpy.utils.unregister_class(CompileLevelOperation)
+    bpy.utils.unregister_class(OpenLevelOperation)
     bpy.utils.unregister_class(FixPanel)
     bpy.utils.unregister_class(FixNamesOperation)
     bpy.utils.unregister_class(FixMeshesOperation)
